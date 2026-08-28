@@ -1,0 +1,73 @@
+name: Local Web App Verification & Release CI
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify-and-package:
+    name: Verify & Create Downloadable Web App ZIP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: TypeScript Type Check & Linting
+        run: npm run lint
+
+      - name: Build Web Application Bundle
+        run: npm run build
+
+      - name: Verify Web Bundle Output (dist/index.html)
+        run: |
+          if [ ! -f "dist/index.html" ]; then
+            echo "ERROR: Production bundle dist/index.html is missing!"
+            exit 1
+          fi
+          echo "SUCCESS: Production web bundle dist/index.html generated successfully."
+
+      - name: Check for Residual Desktop API References (Electron / Tauri)
+        run: |
+          echo "Scanning src/ directory for unwanted Electron / Tauri leaks..."
+          FOUND_DESKTOP=$(grep -rnwi "electronAPI\|@tauri-apps" src/ || true)
+          if [ -n "$FOUND_DESKTOP" ]; then
+            echo "ERROR: Found residual desktop integration references in src/:"
+            echo "$FOUND_DESKTOP"
+            exit 1
+          fi
+          echo "SUCCESS: No Electron or Tauri dependencies found in src/."
+
+      - name: Package Standalone Web App ZIP
+        run: |
+          mkdir -p package_output
+          cd dist && zip -r ../package_output/plmsys-local-web-app.zip . && cd ..
+          echo "Created plmsys-local-web-app.zip successfully."
+
+      - name: Upload Downloadable ZIP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plmsys-local-web-app
+          path: package_output/plmsys-local-web-app.zip
+          retention-days: 90
+
+      - name: Create GitHub Release Asset (On Tagged Release)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: package_output/plmsys-local-web-app.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

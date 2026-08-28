@@ -43,52 +43,6 @@ export class PlateDatabase extends Dexie {
 
 export const db = new PlateDatabase();
 
-// IPC-based database proxy for physical portable database file in Electron
-if (typeof window !== 'undefined' && (window as any).electronAPI) {
-  const tableNames = [
-    'sets',
-    'positions',
-    'plates',
-    'plateInstallations',
-    'plateRemovals',
-    'dailyProduction',
-    'replacements',
-    'jobOrders',
-    'auditLogs',
-    'personnel'
-  ];
-
-  tableNames.forEach((tableName) => {
-    const proxyTable = {
-      toArray: () => (window as any).electronAPI.dbAction(tableName, 'toArray', []),
-      get: (id: any) => (window as any).electronAPI.dbAction(tableName, 'get', [id]),
-      put: (item: any) => (window as any).electronAPI.dbAction(tableName, 'put', [item]),
-      add: (item: any) => (window as any).electronAPI.dbAction(tableName, 'add', [item]),
-      update: (id: any, changes: any) => (window as any).electronAPI.dbAction(tableName, 'update', [id, changes]),
-      delete: (id: any) => (window as any).electronAPI.dbAction(tableName, 'delete', [id]),
-      clear: () => (window as any).electronAPI.dbAction(tableName, 'clear', []),
-      bulkPut: (items: any) => (window as any).electronAPI.dbAction(tableName, 'bulkPut', [items]),
-      count: () => (window as any).electronAPI.dbAction(tableName, 'count', [])
-    };
-    Object.defineProperty(db, tableName, {
-      get: () => proxyTable,
-      configurable: true,
-      enumerable: true
-    });
-  });
-
-  // IMPORTANT DEVELOPMENT NOTE (Requirement 9):
-  // This is a dummy Dexie-compatible transaction proxy to support compatibility with
-  // the existing Dexie API usage in the application without requiring a full refactor.
-  // DO NOT assume or rely on this as a real database transaction!
-  // It immediately executes the callback. There is NO database roll-back or multi-table locking.
-  // For multi-table operations requiring true atomicity, always use a dedicated Electron IPC operation
-  // on the Electron main process layer instead (such as 'factory-reset').
-  (db as any).transaction = (mode: any, tables: any, callback: any) => {
-    return callback();
-  };
-}
-
 // Helper to generate UUID v4
 export function generateUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -105,22 +59,6 @@ export async function seedDatabase(setCount: number = 0, force: boolean = false)
   isSeeding = true;
   
   try {
-    if (typeof window !== 'undefined' && (window as any).electronAPI) {
-      if (force) {
-        const res = await (window as any).electronAPI.factoryReset(setCount);
-        if (!res.success) {
-          throw new Error(res.error || 'Failed to factory reset database');
-        }
-        return;
-      } else {
-        // Normal startup inside Electron: NEVER automatically factory reset.
-        // The main process handles creating the initial factory database if the file plmsys.json did not exist.
-        // Therefore, we return immediately and DO NOT call factoryReset.
-        return;
-      }
-    }
-
-    // Inside browser fallback:
     if (!force) {
       // 1. Check IndexedDB counts FIRST. If there is data in any key table, we must NEVER clear/overwrite it!
       try {

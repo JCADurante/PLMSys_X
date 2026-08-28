@@ -31,8 +31,6 @@ import { RegistryModal } from './components/RegistryModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { TutorialModal } from './components/TutorialModal';
-import { AutoUpdateModal } from './components/AutoUpdateModal';
-import { AdminUpdateNotificationModal } from './components/AdminUpdateNotificationModal';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import { Shield } from 'lucide-react';
 import { getTodayStr, getSetTodayProduction } from './utils';
@@ -57,16 +55,10 @@ export default function App() {
   const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
   const [showRegistryModal, setShowRegistryModal] = useState(false);
   const [showTutorialModal, setShowTutorialModal] = useState(false);
-  const [showUpdaterModal, setShowUpdaterModal] = useState(false);
-  const [isPostUpdateWelcome, setIsPostUpdateWelcome] = useState(false);
 
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [showCreateSetModal, setShowCreateSetModal] = useState(false);
   const [showLogProductionModal, setShowLogProductionModal] = useState(false);
-  const [showAdminNotificationModal, setShowAdminNotificationModal] = useState(false);
-  const [adminNotificationSecondsLeft, setAdminNotificationSecondsLeft] = useState(60);
-  const [adminNotificationVersion, setAdminNotificationVersion] = useState('1.1.0');
-  const [isExecutingUpdateModal, setIsExecutingUpdateModal] = useState(false);
 
   const [selectedPosModal, setSelectedPosModal] = useState<{
     position: PositionRecord;
@@ -144,101 +136,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    const checkDbStatus = async () => {
-      if (window.electronAPI && window.electronAPI.getDbStatus) {
-        try {
-          const res = await window.electronAPI.getDbStatus();
-          if (!res.success && res.error) {
-            console.warn('DATABASE RESTORATION WARNING:', res.error);
-          }
-        } catch (e) {
-          console.error('Failed to get database status:', e);
-        }
-      }
-
-      if (window.electronAPI && window.electronAPI.getAppInfo && window.electronAPI.getLastSeenVersion) {
-        try {
-          const appInfo = await window.electronAPI.getAppInfo();
-          const lastSeen = await window.electronAPI.getLastSeenVersion();
-          
-          if (appInfo && appInfo.version && lastSeen) {
-            if (appInfo.version !== lastSeen && appInfo.version === '1.1.0') {
-              setIsPostUpdateWelcome(true);
-              setShowUpdaterModal(true);
-              if (window.electronAPI.setLastSeenVersion) {
-                await window.electronAPI.setLastSeenVersion(appInfo.version);
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Error checking version history:', e);
-        }
-      }
-    };
-    checkDbStatus();
     loadData();
-
-    let unsubData: (() => void) | undefined;
-    let unsubStatus: (() => void) | undefined;
-    let unsubAdminUpdateInitiated: (() => void) | undefined;
-    let unsubAdminUpdateCountdown: (() => void) | undefined;
-    let unsubAdminUpdateCancelled: (() => void) | undefined;
-    let unsubExecuteAutoUpdateNow: (() => void) | undefined;
-
-    if (window.electronAPI) {
-      if (window.electronAPI.onNetworkDataChanged) {
-        unsubData = window.electronAPI.onNetworkDataChanged(() => {
-          console.log('Network database change event received. Reloading data...');
-          loadData();
-        });
-      }
-      if (window.electronAPI.onNetworkStatusChanged) {
-        unsubStatus = window.electronAPI.onNetworkStatusChanged((status: string) => {
-          console.log('Network connection status update:', status);
-          if (status === 'CONNECTED') {
-            loadData();
-          }
-        });
-      }
-      if (window.electronAPI.onAdminUpdateInitiated) {
-        unsubAdminUpdateInitiated = window.electronAPI.onAdminUpdateInitiated((payload: any) => {
-          setShowAdminNotificationModal(true);
-          setAdminNotificationSecondsLeft(payload.secondsLeft || 60);
-          setAdminNotificationVersion(payload.version || '1.1.0');
-          setIsExecutingUpdateModal(false);
-        });
-      }
-      if (window.electronAPI.onAdminUpdateCountdown) {
-        unsubAdminUpdateCountdown = window.electronAPI.onAdminUpdateCountdown((payload: any) => {
-          setAdminNotificationSecondsLeft(payload.secondsLeft);
-        });
-      }
-      if (window.electronAPI.onAdminUpdateCancelled) {
-        unsubAdminUpdateCancelled = window.electronAPI.onAdminUpdateCancelled((payload: any) => {
-          setShowAdminNotificationModal(false);
-          alert(`Update Cancelled: ${payload.error || 'Pre-update safety backup failed.'}`);
-        });
-      }
-      if (window.electronAPI.onExecuteAutoUpdateNow) {
-        unsubExecuteAutoUpdateNow = window.electronAPI.onExecuteAutoUpdateNow(async () => {
-          setIsExecutingUpdateModal(true);
-          setShowAdminNotificationModal(false);
-          setShowUpdaterModal(true);
-          if (window.electronAPI.startAutoUpdate) {
-            await window.electronAPI.startAutoUpdate();
-          }
-        });
-      }
-    }
-
-    return () => {
-      if (unsubData) unsubData();
-      if (unsubStatus) unsubStatus();
-      if (unsubAdminUpdateInitiated) unsubAdminUpdateInitiated();
-      if (unsubAdminUpdateCountdown) unsubAdminUpdateCountdown();
-      if (unsubAdminUpdateCancelled) unsubAdminUpdateCancelled();
-      if (unsubExecuteAutoUpdateNow) unsubExecuteAutoUpdateNow();
-    };
   }, []);
 
   // Handlers
@@ -983,22 +881,6 @@ export default function App() {
     };
 
     const backupText = JSON.stringify(backupData, null, 2);
-
-    if (window.electronAPI) {
-      await window.electronAPI.writeLog('info', 'Starting database backup export via native save dialog...');
-      const res = await window.electronAPI.saveBackup(backupText);
-      if (res.success) {
-        await window.electronAPI.writeLog('info', `Database backup successfully exported to: ${res.filePath}`);
-        alert(`Database backup exported successfully to:\n${res.filePath}`);
-      } else if (res.error) {
-        await window.electronAPI.writeLog('error', `Database backup export failed: ${res.error}`);
-        alert(`Failed to save database backup: ${res.error}`);
-      } else {
-        await window.electronAPI.writeLog('info', 'Database backup export was cancelled by the user.');
-      }
-      return;
-    }
-
     const blob = new Blob([backupText], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1009,88 +891,6 @@ export default function App() {
   };
 
   const handleImportBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (window.electronAPI) {
-      try {
-        await window.electronAPI.writeLog('info', 'Starting database restore via native open dialog...');
-        
-        // Safety Auto-Backup before overwrite
-        const currentInsts = await db.plateInstallations.toArray();
-        const currentRems = await db.plateRemovals.toArray();
-        const currentData = {
-          sets: await db.sets.toArray(),
-          positions: await db.positions.toArray(),
-          plates: await db.plates.toArray(),
-          plateInstallations: currentInsts,
-          installations: currentInsts,
-          plateRemovals: currentRems,
-          removals: currentRems,
-          dailyProduction: await db.dailyProduction.toArray(),
-          replacements: await db.replacements.toArray(),
-          jobOrders: await db.jobOrders.toArray(),
-          auditLogs: await db.auditLogs.toArray(),
-          personnel: await db.personnel.toArray(),
-        };
-        // Silently save snapshot to data/backups/auto-backup-snap.json
-        await window.electronAPI.saveBackup(JSON.stringify(currentData, null, 2));
-
-        const res = await window.electronAPI.loadBackup();
-        if (res.success && res.data) {
-          const json = JSON.parse(res.data);
-          const instData = json.plateInstallations || json.installations || [];
-          const remData = json.plateRemovals || json.removals || [];
-          
-          await db.transaction('rw', [
-            db.sets,
-            db.positions,
-            db.plates,
-            db.plateInstallations,
-            db.plateRemovals,
-            db.dailyProduction,
-            db.replacements,
-            db.jobOrders,
-            db.auditLogs,
-            db.personnel
-          ], async () => {
-            await db.sets.clear();
-            await db.positions.clear();
-            await db.plates.clear();
-            await db.plateInstallations.clear();
-            await db.plateRemovals.clear();
-            await db.dailyProduction.clear();
-            await db.replacements.clear();
-            await db.jobOrders.clear();
-            await db.auditLogs.clear();
-            await db.personnel.clear();
-
-            if (json.sets?.length) await db.sets.bulkPut(json.sets);
-            if (json.positions?.length) await db.positions.bulkPut(json.positions);
-            if (json.plates?.length) await db.plates.bulkPut(json.plates);
-            if (instData.length) await db.plateInstallations.bulkPut(instData);
-            if (remData.length) await db.plateRemovals.bulkPut(remData);
-            if (json.dailyProduction?.length) await db.dailyProduction.bulkPut(json.dailyProduction);
-            if (json.replacements?.length) await db.replacements.bulkPut(json.replacements);
-            if (json.jobOrders?.length) await db.jobOrders.bulkPut(json.jobOrders);
-            if (json.auditLogs?.length) await db.auditLogs.bulkPut(json.auditLogs);
-            if (json.personnel?.length) await db.personnel.bulkPut(json.personnel);
-          });
-
-          await window.electronAPI.writeLog('info', 'Database backup successfully restored.');
-          alert('Database backup restored successfully!');
-          await loadData();
-        } else if (res.error) {
-          await window.electronAPI.writeLog('error', `Database restore failed: ${res.error}`);
-          alert(`Database restore failed: ${res.error}`);
-        } else {
-          await window.electronAPI.writeLog('info', 'Database restore was cancelled by the user.');
-        }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        await window.electronAPI.writeLog('error', `Failed to parse or apply backup: ${errMsg}`);
-        alert(`Failed to restore backup: ${errMsg}`);
-      }
-      return;
-    }
-
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -1231,10 +1031,6 @@ export default function App() {
             onOpenCreateSet={() => setShowCreateSetModal(true)}
             onOpenLogProduction={() => setShowLogProductionModal(true)}
             onOpenRegistry={() => setShowRegistryModal(true)}
-            onOpenUpdater={() => {
-              setIsPostUpdateWelcome(false);
-              setShowUpdaterModal(true);
-            }}
           />
 
           <main className="flex-grow-1 w-100 px-3 px-md-4 px-lg-5 py-4">
@@ -1396,22 +1192,6 @@ export default function App() {
         setActiveTab={(tab) => {
           setActiveTab(tab);
           setSelectedSetId(null);
-        }}
-      />
-
-      <AutoUpdateModal
-        isOpen={showUpdaterModal}
-        isPostUpdateWelcome={isPostUpdateWelcome}
-        onClose={() => setShowUpdaterModal(false)}
-      />
-
-      <AdminUpdateNotificationModal
-        isOpen={showAdminNotificationModal}
-        secondsLeft={adminNotificationSecondsLeft}
-        version={adminNotificationVersion}
-        isExecutingUpdate={isExecutingUpdateModal}
-        onSaveAndReady={() => {
-          setIsExecutingUpdateModal(true);
         }}
       />
     </div>

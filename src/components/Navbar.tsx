@@ -29,7 +29,6 @@ interface NavbarProps {
   onOpenCreateSet?: () => void;
   onOpenLogProduction?: () => void;
   onOpenRegistry?: () => void;
-  onOpenUpdater?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
