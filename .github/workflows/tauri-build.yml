@@ -1,0 +1,139 @@
+name: "Tauri 2 Windows Build"
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-tauri-windows:
+    name: Build Windows Application
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Rust stable (MSVC)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Toolchain Diagnostics
+        shell: bash
+        run: |
+          echo "=== Environment & Toolchain Diagnostics ==="
+          node -v
+          npm -v
+          rustc -V
+          cargo -V
+
+      - name: Install dependencies (npm ci)
+        shell: bash
+        run: |
+          echo "=== Installing Dependencies via npm ci ==="
+          npm ci --include=optional || npm install --include=optional --force
+          echo "=== Verifying Tauri CLI in node_modules ==="
+          npm list @tauri-apps/cli || npm install --save-dev @tauri-apps/cli @tauri-apps/cli-win32-x64-msvc
+
+      - name: Verify Tauri CLI
+        shell: bash
+        run: |
+          echo "=== Tauri CLI Version Check ==="
+          npx tauri --version || npm run tauri -- --version
+
+      - name: TypeScript Check
+        shell: bash
+        run: |
+          echo "=== Running TypeScript Type Check ==="
+          npx tsc --noEmit
+
+      - name: Build frontend (npm run build)
+        shell: bash
+        env:
+          CI: false
+          NODE_ENV: production
+        run: |
+          echo "=== Building Frontend with Vite ==="
+          npm run build
+          echo "=== Verifying Generated Distribution Files in dist/ ==="
+          ls -la dist
+
+      - name: Check Rust Tauri backend
+        shell: bash
+        working-directory: src-tauri
+        run: |
+          echo "=== Checking Tauri Backend with Cargo ==="
+          cargo check --verbose
+
+      - name: Build Tauri Windows Application (npm run tauri build)
+        shell: bash
+        env:
+          CI: false
+          NODE_ENV: production
+          RUST_BACKTRACE: 1
+          RUST_LOG: debug
+          CARGO_TERM_VERBOSE: true
+        run: |
+          echo "=== Building Tauri Windows Executable & NSIS Bundle ==="
+          npm run tauri build
+
+      - name: Verify Generated Windows Installer
+        shell: bash
+        run: |
+          echo "=== Inspecting Tauri Output Directory ==="
+          ls -la src-tauri/target/release/
+          
+          if [ -d "src-tauri/target/release/bundle" ]; then
+            echo "Bundle directory found:"
+            ls -la src-tauri/target/release/bundle/
+          else
+            echo "ERROR: Bundle directory src-tauri/target/release/bundle does not exist!"
+            exit 1
+          fi
+
+          if [ -d "src-tauri/target/release/bundle/nsis" ]; then
+            echo "NSIS bundle directory found:"
+            ls -la src-tauri/target/release/bundle/nsis/
+            
+            # Ensure an actual .exe installer exists
+            INSTALLER_COUNT=$(find src-tauri/target/release/bundle/nsis -type f -name "*.exe" | wc -l)
+            if [ "$INSTALLER_COUNT" -eq 0 ]; then
+              echo "ERROR: No .exe installer found in src-tauri/target/release/bundle/nsis/!"
+              exit 1
+            fi
+            echo "Found $INSTALLER_COUNT NSIS installer executable(s)."
+          else
+            echo "ERROR: NSIS bundle directory src-tauri/target/release/bundle/nsis does not exist!"
+            exit 1
+          fi
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: PLMSys-Windows
+          path: |
+            src-tauri/target/release/plmsys.exe
+            src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error

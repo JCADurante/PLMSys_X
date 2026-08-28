@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+dist-electron/
+release/
+data/
+data_dev/
+src-tauri/target/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example

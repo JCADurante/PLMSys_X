@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # PHP 8 API Service
+  php-api:
+    image: php:8.2-apache
+    container_name: plmsys_php_api
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www/html/
+    environment:
+      DB_DRIVER: mysql
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: plm_system
+      DB_USER: plm_user
+      DB_PASS: plm_secret
+    depends_on:
+      - mysql-db
+
+  # MySQL 8 Database
+  mysql-db:
+    image: mysql:8.0
+    container_name: plmsys_mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: plm_system
+      MYSQL_USER: plm_user
+      MYSQL_PASSWORD: plm_secret
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../sql/mysql_schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # PostgreSQL 16 Database
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: plmsys_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: plm_system
+      POSTGRES_USER: plm_user
+      POSTGRES_PASSWORD: plm_secret
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ../sql/postgres_schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  mysql_data:
+  pg_data:
