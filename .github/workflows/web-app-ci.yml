@@ -53,7 +53,7 @@ jobs:
       - name: Package Standalone Web App ZIP
         run: |
           mkdir -p package_output
-          cd dist && zip -r ../package_output/plmsys-local-web-app.zip . && cd ..
+          python3 -c "import shutil; shutil.make_archive('package_output/plmsys-local-web-app', 'zip', 'dist')"
           echo "Created plmsys-local-web-app.zip successfully."
 
       - name: Upload Downloadable ZIP Artifact
