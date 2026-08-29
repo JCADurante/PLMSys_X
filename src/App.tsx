@@ -1001,141 +1001,153 @@ export default function App() {
 
   return (
     <div className="min-vh-100 bg-dark text-light d-flex flex-column font-sans" data-bs-theme="dark">
-      {showLoginModal ? (
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setSelectedSetId(null);
+        }}
+        totalPositions={totalPositionsCount}
+        activeSetsCount={sets.length}
+        currentUser={currentUser}
+        sets={sets}
+        selectedSetId={selectedSetId}
+        onSelectSet={(id) => {
+          setSelectedSetId(id);
+          setActiveTab('dashboard');
+        }}
+        onOpenLogin={() => setShowLoginModal(true)}
+        onOpenAdminLogin={() => setShowAdminLoginModal(true)}
+        onLogout={handleLogout}
+        onOpenTutorial={() => setShowTutorialModal(true)}
+        onOpenCreateSet={() => setShowCreateSetModal(true)}
+        onOpenLogProduction={() => setShowLogProductionModal(true)}
+        onOpenRegistry={() => setShowRegistryModal(true)}
+      />
+
+      <main className="flex-grow-1 w-100 px-3 px-md-4 px-lg-5 py-4">
+        {selectedSetId && selectedSet ? (
+          <SetDetail
+            setRecord={selectedSet}
+            sets={sets}
+            positions={positions}
+            plates={plates}
+            installations={installations}
+            jobOrders={jobOrders}
+            dailyProductions={dailyProductions}
+            personnel={personnel}
+            onBack={() => setSelectedSetId(null)}
+            onSelectSet={(id) => setSelectedSetId(id)}
+            onAddProduction={handleAddProduction}
+            onOpenPositionModal={(pos, action) => {
+              setSelectedPosModal({ position: pos, action });
+            }}
+          />
+        ) : (
+          <>
+            {activeTab === 'dashboard' && (
+              <Dashboard
+                sets={sets}
+                positions={positions}
+                plates={plates}
+                installations={installations}
+                removals={removals}
+                currentUser={currentUser}
+                personnel={personnel}
+                onOpenRegistry={() => setShowRegistryModal(true)}
+                onSelectSet={(setId) => setSelectedSetId(setId)}
+                onOpenCreateSet={handleOpenCreateSet}
+                onOpenLogProduction={() => setShowLogProductionModal(true)}
+                onUpdateSet={handleUpdateSet}
+              />
+            )}
+            {activeTab === 'manage-set' && (
+              <ManageSetView
+                sets={sets}
+                positions={positions}
+                plates={plates}
+                onSelectSet={(setId) => setSelectedSetId(setId)}
+                onOpenCreateSet={handleOpenCreateSet}
+                onUpdateSet={handleUpdateSet}
+              />
+            )}
+            {activeTab === 'production' && (
+              <DailyProductionView
+                dailyProductions={dailyProductions}
+                sets={sets}
+                jobOrders={jobOrders}
+                onOpenLogProduction={() => setShowLogProductionModal(true)}
+              />
+            )}
+            {activeTab === 'search' && (
+              <GlobalSearch
+                plates={plates}
+                sets={sets}
+                positions={positions}
+                installations={installations}
+                removals={removals}
+                onSelectSet={(setId) => {
+                  setSelectedSetId(setId);
+                  setActiveTab('dashboard');
+                }}
+                onOpenPositionModal={(pos) => {
+                  setSelectedPosModal({ position: pos, action: 'history' });
+                }}
+              />
+            )}
+            {activeTab === 'audit' && (
+              <AuditLogView auditLogs={auditLogs} sets={sets} positions={positions} plates={plates} />
+            )}
+            {(activeTab === 'admin' || activeTab === 'database') && currentUser.role === 'ADMIN' && (
+              <AdminDashboard 
+                onExportBackup={handleExportBackup} 
+                onImportBackup={handleImportBackup} 
+                onRestoreFactory={handleRestoreFactory}
+                onDataChanged={loadData}
+                initialTab={activeTab === 'database' ? 'database' : 'maintenance'}
+              />
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Modals for App Operations */}
+      {showLoginModal && (
         <LoginModal
           personnel={personnel}
           onClose={() => setShowLoginModal(false)}
           onLogin={handleLogin}
         />
-      ) : (
-        <>
-          <Navbar
-            activeTab={activeTab}
-            setActiveTab={(tab) => {
-              setActiveTab(tab);
-              setSelectedSetId(null);
-            }}
-            totalPositions={totalPositionsCount}
-            activeSetsCount={sets.length}
-            currentUser={currentUser}
-            sets={sets}
-            selectedSetId={selectedSetId}
-            onSelectSet={(id) => {
-              setSelectedSetId(id);
-              setActiveTab('dashboard');
-            }}
-            onOpenLogin={() => setShowLoginModal(true)}
-            onOpenAdminLogin={() => setShowAdminLoginModal(true)}
-            onLogout={handleLogout}
-            onOpenTutorial={() => setShowTutorialModal(true)}
-            onOpenCreateSet={() => setShowCreateSetModal(true)}
-            onOpenLogProduction={() => setShowLogProductionModal(true)}
-            onOpenRegistry={() => setShowRegistryModal(true)}
-          />
+      )}
 
-          <main className="flex-grow-1 w-100 px-3 px-md-4 px-lg-5 py-4">
-            {selectedSetId && selectedSet ? (
-              <SetDetail
-                setRecord={selectedSet}
-                sets={sets}
-                positions={positions}
-                plates={plates}
-                installations={installations}
-                jobOrders={jobOrders}
-                dailyProductions={dailyProductions}
-                personnel={personnel}
-                onBack={() => setSelectedSetId(null)}
-                onSelectSet={(id) => setSelectedSetId(id)}
-                onAddProduction={handleAddProduction}
-                onOpenPositionModal={(pos, action) => {
-                  setSelectedPosModal({ position: pos, action });
-                }}
-              />
-            ) : (
-              <>
-                {activeTab === 'dashboard' && (
-                  <Dashboard
-                    sets={sets}
-                    positions={positions}
-                    plates={plates}
-                    installations={installations}
-                    removals={removals}
-                    currentUser={currentUser}
-                    personnel={personnel}
-                    onOpenRegistry={() => setShowRegistryModal(true)}
-                    onSelectSet={(setId) => setSelectedSetId(setId)}
-                    onOpenCreateSet={handleOpenCreateSet}
-                    onOpenLogProduction={() => setShowLogProductionModal(true)}
-                    onUpdateSet={handleUpdateSet}
-                  />
-                )}
-                {activeTab === 'manage-set' && (
-                  <ManageSetView
-                    sets={sets}
-                    positions={positions}
-                    plates={plates}
-                    onSelectSet={(setId) => setSelectedSetId(setId)}
-                    onOpenCreateSet={handleOpenCreateSet}
-                    onUpdateSet={handleUpdateSet}
-                  />
-                )}
-                {activeTab === 'production' && (
-                  <DailyProductionView
-                    dailyProductions={dailyProductions}
-                    sets={sets}
-                    jobOrders={jobOrders}
-                    onOpenLogProduction={() => setShowLogProductionModal(true)}
-                  />
-                )}
-                {activeTab === 'search' && (
-                  <GlobalSearch
-                    plates={plates}
-                    sets={sets}
-                    positions={positions}
-                    installations={installations}
-                    removals={removals}
-                    onSelectSet={(setId) => {
-                      setSelectedSetId(setId);
-                      setActiveTab('dashboard');
-                    }}
-                    onOpenPositionModal={(pos) => {
-                      setSelectedPosModal({ position: pos, action: 'history' });
-                    }}
-                  />
-                )}
-                {activeTab === 'audit' && (
-                  <AuditLogView auditLogs={auditLogs} sets={sets} positions={positions} plates={plates} />
-                )}
-                {(activeTab === 'admin' || activeTab === 'database') && currentUser.role === 'ADMIN' && (
-                  <AdminDashboard 
-                    onExportBackup={handleExportBackup} 
-                    onImportBackup={handleImportBackup} 
-                    onRestoreFactory={handleRestoreFactory}
-                    onDataChanged={loadData}
-                    initialTab={activeTab === 'database' ? 'database' : 'maintenance'}
-                  />
-                )}
-              </>
-            )}
-          </main>
-
-          {/* Modals for App Operations */}
-          {selectedPosModal && (
-            <PositionModal
-              position={selectedPosModal.position}
-              setRecord={sets.find(s => s.id === selectedPosModal.position.setId)!}
-              currentPlate={plates.find(p => p.id === selectedPosModal.position.currentPlateId)}
-              installation={installations.find(i => i.positionId === selectedPosModal.position.id && i.plateId === selectedPosModal.position.currentPlateId)}
-              removals={removals}
-              personnel={personnel}
-              onClose={() => setSelectedPosModal(null)}
-              onInstallPlate={handleInstallPlate}
-              onReplacePlate={handleReplacePlate}
-              action={selectedPosModal.action}
-              installations={installations}
-              plates={plates}
-            />
-          )}
+      {selectedPosModal && (
+        <PositionModal
+          position={selectedPosModal.position}
+          setRecord={sets.find(s => s.id === selectedPosModal.position.setId) || {
+            id: selectedPosModal.position.setId,
+            setNumber: selectedPosModal.position.setNumber,
+            displayName: `SET ${selectedPosModal.position.setNumber}`,
+            shortCode: `S${selectedPosModal.position.setNumber}`,
+            status: 'ACTIVE',
+            currentTotalCycle: 0,
+            initialCycle: 0,
+            todayProduction: 0,
+            lastProductionDate: getTodayStr(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }}
+          currentPlate={plates.find(p => p.id === selectedPosModal.position.currentPlateId)}
+          installation={installations.find(i => i.positionId === selectedPosModal.position.id && i.plateId === selectedPosModal.position.currentPlateId)}
+          removals={removals}
+          personnel={personnel}
+          onClose={() => setSelectedPosModal(null)}
+          onInstallPlate={handleInstallPlate}
+          onReplacePlate={handleReplacePlate}
+          action={selectedPosModal.action}
+          installations={installations}
+          plates={plates}
+        />
+      )}
 
           {showCreateSetModal && (
             <CreateSetModal
@@ -1171,16 +1183,14 @@ export default function App() {
             />
           )}
 
-          {/* Footer */}
-          <footer className="w-full py-4 px-6 text-center text-xs text-[#8E9299] border-t border-[#1E222A] bg-[#0A0B0E] mt-auto">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
-              <div>
-                <strong className="text-white">Plate Lifecycle Monitoring System (PLMSys)</strong>
-              </div>
-            </div>
-          </footer>
-        </>
-      )}
+      {/* Footer */}
+      <footer className="w-full py-4 px-6 text-center text-xs text-[#8E9299] border-t border-[#1E222A] bg-[#0A0B0E] mt-auto">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
+          <div>
+            <strong className="text-white">Plate Lifecycle Monitoring System (PLMSys)</strong>
+          </div>
+        </div>
+      </footer>
 
       <TutorialModal
         isOpen={showTutorialModal}

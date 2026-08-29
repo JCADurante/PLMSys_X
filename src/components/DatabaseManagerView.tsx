@@ -8,7 +8,7 @@ interface DatabaseManagerProps {
 
 export const DatabaseManagerView: React.FC<DatabaseManagerProps> = ({ onDataChanged }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'php' | 'sql' | 'query'>('overview');
-  const [dbDriver, setDbDriver] = useState<'mysql' | 'pgsql'>('mysql');
+  const [dbDriver, setDbDriver] = useState<'mysql' | 'postgres'>('mysql');
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusData, setStatusData] = useState<any>(null);
   const [testResult, setTestResult] = useState<{ success: boolean; latencyMs?: number; message?: string; error?: string } | null>(null);
@@ -439,13 +439,13 @@ curl http://localhost:8000/health
                   </div>
 
                   <div
-                    onClick={() => setDbDriver('pgsql')}
-                    className={`p-3 rounded-3 border flex-fill cursor-pointer transition ${dbDriver === 'pgsql' ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary bg-body-tertiary'}`}
+                    onClick={() => setDbDriver('postgres')}
+                    className={`p-3 rounded-3 border flex-fill cursor-pointer transition ${dbDriver === 'postgres' ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary bg-body-tertiary'}`}
                     style={{ cursor: 'pointer' }}
                   >
                     <div className="d-flex align-items-center justify-content-between">
                       <div className="fw-bold text-white">PostgreSQL 14+</div>
-                      {dbDriver === 'pgsql' && <Check className="w-5 h-5 text-primary" />}
+                      {dbDriver === 'postgres' && <Check className="w-5 h-5 text-primary" />}
                     </div>
                     <div className="text-secondary small mt-1">UUID, Timestamp with Time Zone, PDO pgsql driver</div>
                   </div>

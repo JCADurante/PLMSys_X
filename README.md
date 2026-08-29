@@ -51,7 +51,17 @@ PLMSys is a 100% offline, standalone local web application designed for flexogra
 
 ## 🚀 Setup & Installation Guide
 
-### 1. Development Setup
+### ⚡ Quick One-Click Setup (Windows)
+
+For Windows users, convenience batch scripts are provided in the root folder so you don't need to open a terminal:
+
+- **`START.bat`**: Double-click to automatically check dependencies, run `npm install` if needed, start the development server, and automatically launch `http://localhost:3000` in your default web browser!
+- **`START-PRODUCTION.bat`**: Double-click to compile a production build and launch the production server with browser auto-opening.
+- **`start.sh`**: Double-click or execute (`./start.sh`) for macOS / Linux users.
+
+---
+
+### 1. Manual Development Setup
 
 1. **Clone or Extract the Project**:
    ```bash
