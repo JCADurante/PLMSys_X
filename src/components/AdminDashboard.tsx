@@ -1,14 +1,15 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Upload, Shield, Database, Clock, Activity, AlertCircle, RefreshCw, CheckCircle2, X, Server } from 'lucide-react';
+import { Download, Upload, Shield, Database, Clock, Activity, AlertCircle, RefreshCw, CheckCircle2, X, Server, Wifi, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { DatabaseManagerView } from './DatabaseManagerView';
+import { MiniserveHub } from './MiniserveHub';
 
 interface AdminDashboardProps {
   onExportBackup: () => Promise<void>;
   onImportBackup: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   onRestoreFactory: () => Promise<void>;
   onDataChanged?: () => void;
-  initialTab?: 'maintenance' | 'database';
+  initialTab?: 'maintenance' | 'database' | 'miniserve';
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -18,7 +19,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDataChanged,
   initialTab = 'maintenance'
 }) => {
-  const [adminSubTab, setAdminSubTab] = useState<'maintenance' | 'database'>(initialTab);
+  const [adminSubTab, setAdminSubTab] = useState<'maintenance' | 'database' | 'miniserve'>(initialTab);
 
   useEffect(() => {
     if (initialTab) {
@@ -98,6 +99,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <Server className="w-3.5 h-3.5" />
             <span>DB & Schema Studio</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminSubTab('miniserve')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+              adminSubTab === 'miniserve'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'text-[#8E9299] hover:text-white hover:bg-[#191D28]'
+            }`}
+          >
+            <Wifi className="w-3.5 h-3.5" />
+            <span className="flex items-center gap-1">
+              Miniserve LAN Server
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </span>
           </button>
         </div>
       </div>
@@ -243,6 +260,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {adminSubTab === 'database' && (
         <div className="animate-fadeIn">
           <DatabaseManagerView onDataChanged={onDataChanged} />
+        </div>
+      )}
+
+      {/* SUB-TAB 3: MINISERVE LAN & OFFLINE SERVER */}
+      {adminSubTab === 'miniserve' && (
+        <div className="animate-fadeIn">
+          <MiniserveHub />
         </div>
       )}
 

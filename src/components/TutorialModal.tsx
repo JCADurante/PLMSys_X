@@ -92,6 +92,13 @@ const steps: TutorialStep[] = [
     icon: <Shield className="w-6 h-6 text-[#F27D26]" />,
     description: 'Manage authorized personnel, configure supervisor sign-off passwords, oversee system access roles, and perform factory resets when required.',
     tip: 'Requires Admin authentication credentials.'
+  },
+  {
+    title: 'Miniserve LAN & Offline Server',
+    tab: 'admin',
+    icon: <Database className="w-6 h-6 text-emerald-400" />,
+    description: 'Host PLMSys across shop-floor PCs and tablets with zero dependencies using Miniserve v0.35.0. Access the Miniserve LAN Server tab in Admin Control Center to configure ports, download one-click launchers, and generate firewall rules.',
+    tip: 'No Node.js installation required on factory client computers.'
   }
 ];
 

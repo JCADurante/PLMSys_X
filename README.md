@@ -120,13 +120,15 @@ Example: 082926-01-05 (Manufactured Aug 29, 2026, for Set 01, Position P05)
 
 ## 🚀 Quick Start & Setup Guide
 
-### ⚡ One-Click Windows Launchers
+### ⚡ One-Click Launchers (Windows, Linux, macOS)
 
-Double-clickable batch scripts are provided in the root directory for shop-floor operators and supervisors:
+Executable scripts are provided in the root directory for shop-floor operators and supervisors:
 
-- **`START.bat`**: Double-click to verify dependencies, install missing packages automatically, launch the local server, and open `http://localhost:3000` in your default browser.
-- **`START-PRODUCTION.bat`**: Double-click to compile a fresh production build and start the standalone production server.
-- **`start.sh`**: Shell launcher for Linux and macOS environments (`./start.sh`).
+- **`START-MINISERVE.bat`** *(NEW)*: High-performance, zero-install launcher using the latest **Miniserve v0.35.0**. Automatically downloads `miniserve.exe` if not found, binds to `0.0.0.0:3000` for full Local Area Network (LAN) tablet connectivity, and opens the browser.
+- **`start-miniserve.sh`** *(NEW)*: Linux/macOS high-performance Miniserve launcher (`./start-miniserve.sh`).
+- **`START.bat`**: Development server launcher with automatic Node.js dependency checks and live browser launch.
+- **`START-PRODUCTION.bat`**: Compiles a fresh production bundle (`npm run build`) and starts the Express production server.
+- **`start.sh`**: Shell development launcher for Linux and macOS environments (`./start.sh`).
 
 ---
 
@@ -169,16 +171,61 @@ Double-clickable batch scripts are provided in the root directory for shop-floor
 
 ---
 
-### Zero-Install Miniserve Setup (LAN / Factory PC)
+### 🌐 Zero-Install Miniserve Setup (LAN / Factory Air-Gapped PCs)
 
-For air-gapped shop-floor PCs without Node.js installed, use [`miniserve`](https://github.com/svenstaro/miniserve) to host the static `dist/` bundle:
+For air-gapped shop-floor PCs, touchscreen consoles, and tablets without Node.js installed, use the latest [**Miniserve v0.35.0**](https://github.com/svenstaro/miniserve):
 
-1. Download `miniserve.exe` and place it in the same directory as the compiled `dist/` assets (`index.html`, `assets/`).
-2. Run:
+#### 1. Automated 1-Click Launch (Windows)
+Double-click **`START-MINISERVE.bat`**. The script will:
+- Check for `miniserve.exe` (and automatically download it via PowerShell if missing)
+- Build the production bundle into `dist/` if not present
+- Display your machine's local IPv4 network address
+- Launch Miniserve on `http://0.0.0.0:3000` in Single-Page Application (SPA) mode
+- Open your browser to `http://localhost:3000`
+
+#### 2. Manual Miniserve Installation & Launch
+
+**Download Binaries (Miniserve v0.35.0):**
+- **Windows (x86_64)**: [miniserve-v0.35.0-x86_64-pc-windows-msvc.exe](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-pc-windows-msvc.exe) *(rename to `miniserve.exe`)*
+- **Linux (x86_64)**: [miniserve-v0.35.0-x86_64-unknown-linux-musl](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-unknown-linux-musl)
+- **macOS (Apple Silicon)**: [miniserve-v0.35.0-aarch64-apple-darwin](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-aarch64-apple-darwin)
+- **macOS (Intel)**: [miniserve-v0.35.0-x86_64-apple-darwin](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-apple-darwin)
+
+**Package Managers:**
+```bash
+# Windows (winget)
+winget install svenstaro.miniserve
+
+# Rust Cargo
+cargo install miniserve
+
+# macOS Homebrew
+brew install miniserve
+```
+
+**Run Miniserve Command:**
+```cmd
+# Standard Production SPA Server (LAN Enabled on port 3000)
+miniserve --spa --index index.html --port 3000 --interfaces 0.0.0.0 dist
+
+# With HTTP Basic Authentication
+miniserve --spa --index index.html --port 3000 --auth admin:JADB1994 --interfaces 0.0.0.0 dist
+```
+
+#### 3. Connecting Factory Tablets / LAN Client Devices
+1. Ensure the host computer and client tablets/PCs are on the same local network (Wi-Fi or Ethernet).
+2. Open Windows Firewall port 3000 if prompted, or run in Administrator PowerShell/CMD:
    ```cmd
-   miniserve.exe --spa --index index.html --port 8080 --interfaces 0.0.0.0 .
+   netsh advfirewall firewall add rule name="PLMSys Miniserve" dir=in action=allow protocol=TCP localport=3000
    ```
-3. Other devices on the factory local network (LAN) can connect via `http://<HOST-IP>:8080`.
+3. Find the host IP address with `ipconfig` (e.g., `192.168.1.100`).
+4. On any tablet or shop-floor device, open:
+   ```
+   http://192.168.1.100:3000
+   ```
+
+#### 4. In-App Miniserve Hub
+Administrators can also navigate to **Admin Control Center** > **Miniserve LAN Server** inside PLMSys to access the interactive live command configurator, generate custom ports, and download batch scripts directly.
 
 ---
 
