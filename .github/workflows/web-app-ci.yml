@@ -53,8 +53,20 @@ jobs:
       - name: Package Standalone Web App ZIP
         run: |
           mkdir -p package_output
-          python3 -c "import shutil; shutil.make_archive('package_output/plmsys-local-web-app', 'zip', 'dist')"
-          echo "Created plmsys-local-web-app.zip successfully."
+          mkdir -p staging_package
+          cp -r dist staging_package/
+          cp -r backend staging_package/
+          cp -r sql staging_package/
+          cp START-MINISERVE.bat staging_package/
+          cp START-PRODUCTION.bat staging_package/
+          cp START.bat staging_package/
+          cp start-miniserve.sh staging_package/
+          cp start.sh staging_package/
+          cp package.json staging_package/
+          cp README.md staging_package/
+          cp CHANGELOG.md staging_package/
+          python3 -c "import shutil; shutil.make_archive('package_output/plmsys-local-web-app', 'zip', 'staging_package')"
+          echo "Created complete plmsys-local-web-app.zip with launchers and backend."
 
       - name: Upload Downloadable ZIP Artifact
         uses: actions/upload-artifact@v4
