@@ -64,36 +64,55 @@ export const MiniserveHub: React.FC = () => {
 
   const handleDownloadBatch = () => {
     const content = `@echo off
+setlocal enabledelayedexpansion
 TITLE PLMSys - Miniserve High-Performance LAN Server
+cd /d "%~dp0"
+
 ECHO ============================================================
 ECHO     PLMSys - Miniserve Zero-Install LAN / Offline Server
 ECHO            (Latest Miniserve v0.35.0 Engine)
 ECHO ============================================================
 ECHO.
 
-SET MINISERVE_EXE=miniserve.exe
-SET PORT=${selectedPort || '3000'}
-SET BUNDLE_DIR=dist
+SET "PORT=${selectedPort || '3000'}"
+SET "BUNDLE_DIR=dist"
+SET "RUN_EXE="
 
-if exist "%MINISERVE_EXE%" (
-    SET RUN_EXE=%MINISERVE_EXE%
-) else if exist "tools\\%MINISERVE_EXE%" (
-    SET RUN_EXE=tools\\%MINISERVE_EXE%
+if not exist "dist\\" (
+    if not exist "package.json" (
+        ECHO [ERROR] Project files not found!
+        ECHO Please extract the ZIP file before running this script.
+        PAUSE
+        EXIT /B 1
+    )
+)
+
+if exist "miniserve.exe" (
+    SET "RUN_EXE=miniserve.exe"
+) else if exist "tools\\miniserve.exe" (
+    SET "RUN_EXE=tools\\miniserve.exe"
 ) else (
     where miniserve >nul 2>nul
-    if %errorlevel% equ 0 (
-        SET RUN_EXE=miniserve
+    if !errorlevel! equ 0 (
+        SET "RUN_EXE=miniserve"
+    )
+)
+
+if "%RUN_EXE%"=="" (
+    ECHO [INFO] Downloading Miniserve v0.35.0 for Windows...
+    where curl.exe >nul 2>nul
+    if !errorlevel! equ 0 (
+        curl.exe -L -o miniserve.exe "https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-pc-windows-msvc.exe"
+    )
+    if not exist "miniserve.exe" (
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-pc-windows-msvc.exe', 'miniserve.exe')"
+    )
+    if exist "miniserve.exe" (
+        SET "RUN_EXE=miniserve.exe"
     ) else (
-        ECHO [INFO] miniserve.exe not found. Downloading latest Miniserve v0.35.0 for Windows...
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-pc-windows-msvc.exe' -OutFile 'miniserve.exe'"
-        if exist "%MINISERVE_EXE%" (
-            ECHO [SUCCESS] miniserve.exe downloaded!
-            SET RUN_EXE=%MINISERVE_EXE%
-        ) else (
-            ECHO [ERROR] Please manually download miniserve.exe to this directory.
-            PAUSE
-            EXIT /B 1
-        )
+        ECHO [ERROR] Please manually download miniserve.exe to this folder.
+        PAUSE
+        EXIT /B 1
     )
 )
 
@@ -109,7 +128,7 @@ ipconfig | findstr /i "IPv4"
 ECHO ============================================================
 ECHO.
 start "" "http://localhost:%PORT%"
-"${currentCommand}"
+%RUN_EXE% ${buildCommand().replace(/^miniserve\s+/, '')}
 PAUSE
 `;
     const blob = new Blob([content], { type: 'text/plain' });
