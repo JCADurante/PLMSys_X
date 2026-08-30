@@ -1,67 +1,136 @@
-# PLMSys - Printing Plate & Cylinder Set Management System
+# PLMSys - Lamination Section Plate Lifecycle Monitoring System
 
-PLMSys is a 100% offline, standalone local web application designed for flexographic printing plate and cylinder set lifecycle management. It enables production teams to track mold plates, cylinder positions, daily production cycles, job orders, operator logs, supervisor sign-offs, and complete audit history. All application data is securely persisted locally in your browser using **IndexedDB (Dexie)**.
+**PLMSys** is a dedicated, 100% offline-first industrial web application designed for the **Lamination Section** to monitor and manage the full lifecycle of **laminating plates** across production cylinder sets and individual plate positions (P01–P11).
+
+The system tracks the complete operational history of every laminating plate: installation, cycle accumulation, removal evaluation (**RETIRED** vs. **REJECTED**), multi-category defect classification, root-cause descriptions, source of reject, and corrective action histories. All data is securely persisted locally in the browser using **IndexedDB (Dexie.js)** with full JSON backup/restore and SQL dump capabilities.
 
 ---
 
 ## 📋 Table of Contents
 
-- [Features](#-features)
+- [Overview & Purpose](#-overview--purpose)
+- [Key Features for Lamination Section](#-key-features-for-lamination-section)
+- [Laminating Plate Lifecycle & Evaluation Workflow](#-laminating-plate-lifecycle--evaluation-workflow)
+  - [1. Plate Statuses (Active, Retired, Rejected)](#1-plate-statuses)
+  - [2. Defect Classification & Reject Reasons](#2-defect-classification--reject-reasons)
+  - [3. Plate Serial Number Scheme](#3-plate-serial-number-scheme)
 - [System Requirements](#-system-requirements)
-- [Setup & Installation Guide](#-setup--installation-guide)
-  - [Development Setup](#1-development-setup)
-  - [Production Setup & Server](#2-production-setup--server)
-  - [Downloading via GitHub ZIP](#3-downloading-via-github-zip)
-  - [Zero-Install Miniserve Setup (Offline & LAN Guide)](#4-zero-install-miniserve-setup-complete-offline--lan-guide)
-  - [Alternative Server Options (`npx serve`)](#5-alternative-server-options-npx-serve)
-- [How to Use the Application (User Guide)](#-how-to-use-the-application-user-guide)
-  - [1. User Roles & Default Passwords](#1-user-roles--default-passwords)
-  - [2. Navigation Overview](#2-navigation-overview)
-  - [3. Managing Cylinder Sets & Positions](#3-managing-cylinder-sets--positions)
-  - [4. Installing, Replacing & Removing Mold Plates](#4-installing-replacing--removing-mold-plates)
-  - [5. Logging Daily Production Cycles](#5-logging-daily-production-cycles)
-  - [6. Reviewing Daily Production & History](#6-reviewing-daily-production--history)
-  - [7. Audit Trail & Search](#7-audit-trail--search)
-  - [8. Admin Dashboard, Backups & DB Studio](#8-admin-dashboard-backups--db-studio)
+- [Quick Start & Setup Guide](#-quick-start--setup-guide)
+  - [⚡ One-Click Windows Launchers](#-one-click-windows-launchers)
+  - [Manual Setup (Development)](#manual-development-setup)
+  - [Production Setup & Start](#production-setup--start)
+  - [Zero-Install Miniserve Setup (LAN / Factory PC)](#zero-install-miniserve-setup-lan--factory-pc)
+- [User Guide](#-user-guide)
+  - [1. Roles & Credentials](#1-roles--credentials)
+  - [2. Cylinder Set & Position Management](#2-cylinder-set--position-management)
+  - [3. Installing, Replacing & Retiring/Rejecting Plates](#3-installing-replacing--retiringrejecting-plates)
+  - [4. Logging Daily Production & Supervisor Sign-Off](#4-logging-daily-production--supervisor-sign-off)
+  - [5. Traceability, Plate Search & Audit Trail](#5-traceability-plate-search--audit-trail)
+  - [6. Admin Tools, Backups & DB Studio](#6-admin-tools-backups--db-studio)
 - [Project Architecture](#-project-architecture)
-- [Troubleshooting & FAQs](#-troubleshooting--faqs)
+- [Frequently Asked Questions (FAQs)](#-frequently-asked-questions-faqs)
 
 ---
 
-## ✨ Features
+## 🏭 Overview & Purpose
 
-- **Dashboard & Set Tracking**: Real-time view of active sets, cycle counts, target limits, and operational statuses.
-- **Position Grid**: Interactive visual matrix of plate positions on each cylinder set.
-- **Plate Lifecycle Management**: Track individual plate serial numbers, installation dates, wear thresholds, replacement history, and removal reasons.
-- **Production Logging**: Log daily impression cycles with Job Order tracking (`0000-00` format), operator details, and required supervisor sign-off verification.
-- **Immutable Audit Logging**: Automatic recording of all administrative and operational actions for quality assurance and compliance.
-- **Database Backups & Recovery**: Export full database snapshots to JSON files and restore data seamlessly.
-- **Database & Schema Studio**: Built-in Admin DB Studio for inspecting, querying, and managing IndexedDB collections directly inside the browser.
-- **Offline & Private**: Zero external database or cloud connection required. All data resides 100% on the local user machine.
+In industrial lamination processes, laminating plates mounted on cylinder sets undergo continuous mechanical, thermal, and surface stress across thousands of production cycles. Maintaining strict quality control requires:
+
+1. **Individual Plate Traceability**: Monitoring each laminating plate by its position slot (P01 through P11) and unique serial number (`MMDDYY-SET-POS`).
+2. **Defect & Rejection Tracking**: Distinguishing plates that completed their normal useful life (**RETIRED**) from plates taken out of service due to quality defects or operational failures (**REJECTED**).
+3. **Root Cause & Corrective Action Logging**: Recording the specific defect type (surface damage, cracking, chipping, excessive wear, dimensional failure, dents), detailed defect descriptions, source of reject, and corrective actions taken.
+4. **Shift & Cycle Verification**: Tracking daily impression cycles with Job Order numbers (`0000-00` format), operator IDs, and supervisor sign-off authorization.
+
+---
+
+## ✨ Key Features for Lamination Section
+
+- **Sets & Positions Dashboard**: Visual overview of all active lamination cylinder sets, total accumulated cycles, today's production, and active plate counts.
+- **11-Position Visual Matrix**: Interactive slot-by-slot view (P01 to P11) showing current installed plate serial numbers, installation cycles, and real-time accumulated plate life (`Current Set Cycle - Install Cycle`).
+- **Defect & Rejection Logging**: Built-in evaluation modal to categorize rejected laminating plates with multi-select defect tags, detailed notes, source of reject, and corrective action records.
+- **Daily Production Logging**: Log shift cycles per cylinder set with automatic cycle calculation, Job Order validation (`0000-00`), operator selection, and mandatory supervisor password sign-off.
+- **Global Plate Traceability Search**: Search laminating plates by serial number, manufacturing date, status (Active, Retired, Rejected), or cylinder set to view complete installation and removal ledgers.
+- **Immutable Audit Trail**: Automatic audit logging (`AUD-XXXXXX`) with timestamps, operator IDs, supervisor sign-offs, and old vs. new value diffs.
+- **100% Offline & Private**: Zero external cloud or database dependencies required. Works completely offline on shop-floor PCs and tablets.
+- **Database Backup & SQL Export**: One-click JSON backup export/import, factory reset protection, and MySQL / PostgreSQL `.sql` schema and data dump generator.
+
+---
+
+## 🔬 Laminating Plate Lifecycle & Evaluation Workflow
+
+```
+[ New Plate Manufactured ] ───► [ Installed in Position (P01-P11) ]
+                                          │
+                                          ▼
+                                [ Daily Production Cycles Logged ]
+                                (Accumulates Plate Impressions)
+                                          │
+                    ┌─────────────────────┴─────────────────────┐
+                    ▼                                           ▼
+          [ Normal Wear-Out ]                         [ Defect Identified ]
+                    │                                           │
+                    ▼                                           ▼
+             Status: RETIRED                             Status: REJECTED
+        (Reached target lifespan)                 (Logged with Defect Classification)
+```
+
+### 1. Plate Statuses
+
+| Status | Definition | Description |
+| :--- | :--- | :--- |
+| **`ACTIVE`** | In Production | Plate is currently mounted on a cylinder position and accumulating production cycles. |
+| **`RETIRED`** | Normal End-of-Life | Plate reached its target cycle threshold and was decommissioned without premature defect. |
+| **`REJECTED`** | Quality / Defect Removal | Plate was removed prematurely due to surface defects, cracks, wear, or operational issues. |
+| **`REPLACED`** | Swapped Out | Plate was replaced by another plate in the same position slot. |
+| **`REMOVED`** | Demounted | Plate was dismounted from the cylinder position without immediate replacement. |
+
+### 2. Defect Classification & Reject Reasons
+
+When a laminating plate is flagged as **REJECTED**, operators and supervisors record:
+
+- **Defect Category (`rejectType`)**:
+  - `WEAR` — **Excessive Wear**: Uneven thinning or severe surface wear beyond allowable tolerance.
+  - `SURFACE` — **Surface Damage**: Scratches, gouges, blisters, or foreign material impressions on the laminating surface.
+  - `CRACK` — **Crack**: Structural fracture along the plate body, edges, or mounting bevels.
+  - `CHIP` — **Chipping**: Missing material or chipped corners along working edges.
+  - `DENT` — **Dent / Impact**: Physical dent caused by mechanical impact or foreign debris during lamination.
+  - `DIM` — **Dimension Failure**: Plate stretching, shrinkage, or dimensional deviation causing misregistration.
+  - `OTHER` — **Other Defect**: Unspecified or unique defect documented in the description.
+- **Defect Description (`rejectDescription`)**: Detailed observations regarding the visual or measured defect.
+- **Source of Reject (`sourceOfReject`)**: Identification of whether the defect originated from raw material, handling, machine error, or foreign object contamination.
+- **Corrective Action (`correctiveAction`)**: Steps taken to address the root cause and prevent recurrence on subsequent runs.
+
+### 3. Plate Serial Number Scheme
+
+PLMSys automatically generates standardized plate serial numbers in the format:
+```
+MMDDYY-SET-POS
+Example: 082926-01-05 (Manufactured Aug 29, 2026, for Set 01, Position P05)
+```
 
 ---
 
 ## 🖥 System Requirements
 
 - **Node.js**: v18.0.0 or higher (v20+ recommended)
-- **Modern Web Browser**: Google Chrome, Microsoft Edge, Mozilla Firefox, or Apple Safari with IndexedDB support.
-- **Operating System**: Windows, macOS, or Linux.
+- **Web Browser**: Any modern browser with IndexedDB support (Google Chrome, Microsoft Edge, Mozilla Firefox, Safari).
+- **Operating System**: Windows 10/11, macOS, Linux, or factory tablet devices.
 
 ---
 
-## 🚀 Setup & Installation Guide
+## 🚀 Quick Start & Setup Guide
 
-### ⚡ Quick One-Click Setup (Windows)
+### ⚡ One-Click Windows Launchers
 
-For Windows users, convenience batch scripts are provided in the root folder so you don't need to open a terminal:
+Double-clickable batch scripts are provided in the root directory for shop-floor operators and supervisors:
 
-- **`START.bat`**: Double-click to automatically check dependencies, run `npm install` if needed, start the development server, and automatically launch `http://localhost:3000` in your default web browser!
-- **`START-PRODUCTION.bat`**: Double-click to compile a production build and launch the production server with browser auto-opening.
-- **`start.sh`**: Double-click or execute (`./start.sh`) for macOS / Linux users.
+- **`START.bat`**: Double-click to verify dependencies, install missing packages automatically, launch the local server, and open `http://localhost:3000` in your default browser.
+- **`START-PRODUCTION.bat`**: Double-click to compile a fresh production build and start the standalone production server.
+- **`start.sh`**: Shell launcher for Linux and macOS environments (`./start.sh`).
 
 ---
 
-### 1. Manual Development Setup
+### Manual Development Setup
 
 1. **Clone or Extract the Project**:
    ```bash
@@ -79,201 +148,101 @@ For Windows users, convenience batch scripts are provided in the root folder so 
    npm run dev
    ```
 
-4. **Access Application**:
-   Open your browser and navigate to `http://localhost:3000`.
+4. **Open in Browser**:
+   Navigate to `http://localhost:3000`.
 
 ---
 
-### 2. Production Setup & Server
+### Production Setup & Start
 
-To compile the application for production deployment:
-
-1. **Build the Production Asset Bundle**:
+1. **Build the Production Bundle**:
    ```bash
    npm run build
    ```
-   *This compiles the Vite static frontend into `dist/` and bundles `server.ts` into `dist/server.cjs`.*
+   *Compiles the Vite static frontend into `dist/` and bundles `server.ts` into `dist/server.cjs`.*
 
 2. **Start Production Server**:
    ```bash
    npm start
    ```
-   *The Express backend server will serve the static application on `http://localhost:3000`.*
+   *The Express server serves the static application on `http://localhost:3000`.*
 
 ---
 
-### 3. Downloading via GitHub ZIP
+### Zero-Install Miniserve Setup (LAN / Factory PC)
 
-#### Option A: Source Code ZIP
-1. Navigate to the main repository page on GitHub.
-2. Click the green **Code** button at the top right.
-3. Select **Download ZIP** and extract it on your local computer.
-4. Follow the [Development Setup](#1-development-setup) instructions above.
+For air-gapped shop-floor PCs without Node.js installed, use [`miniserve`](https://github.com/svenstaro/miniserve) to host the static `dist/` bundle:
 
-#### Option B: Pre-Built Standalone Web Bundle ZIP (`plmsys-local-web-app.zip`)
-1. Open the **Actions** tab on your GitHub repository.
-2. Select the latest **Local Web App Verification & Release CI** workflow run.
-3. Scroll down to the **Artifacts** section at the bottom.
-4. Download **`plmsys-local-web-app`** (ZIP containing ready-to-serve production HTML/JS assets).
+1. Download `miniserve.exe` and place it in the same directory as the compiled `dist/` assets (`index.html`, `assets/`).
+2. Run:
+   ```cmd
+   miniserve.exe --spa --index index.html --port 8080 --interfaces 0.0.0.0 .
+   ```
+3. Other devices on the factory local network (LAN) can connect via `http://<HOST-IP>:8080`.
 
 ---
 
-### 4. Zero-Install Miniserve Setup (Complete Offline & LAN Guide)
+## 📖 User Guide
 
-`miniserve` is a single-file, zero-dependency executable web server written in Rust. It is ideal for shop-floor PCs or isolated environments without Node.js installed.
+### 1. Roles & Credentials
 
-#### Step 1: Download `miniserve`
-- Download the single executable for your OS from the official Releases page:
-  - **Windows**: Download `miniserve-vX.Y.Z-x86_64-pc-windows-msvc.exe` and rename it to `miniserve.exe`.
-  - **Linux**: Download `miniserve-vX.Y.Z-x86_64-unknown-linux-musl` and rename it to `miniserve`.
-  - **macOS**: Download `miniserve-vX.Y.Z-x86_64-apple-darwin` (or ARM64).
-
-#### Step 2: Prepare Folder Structure
-Extract your `plmsys-local-web-app.zip` (or `dist` folder) so that `miniserve.exe` sits next to `index.html` and assets:
-```
-my-shopfloor-app/
-├── assets/
-│   ├── index-xxxx.js
-│   └── index-xxxx.css
-├── index.html
-├── favicon.ico
-└── miniserve.exe
-```
-
-#### Step 3: Run Miniserve
-Open terminal / command prompt inside `my-shopfloor-app/` and run:
-
-**Local-only access (Single PC):**
-```cmd
-miniserve.exe --spa --index index.html --port 8080 .
-```
-
-**Network / LAN access (Accessible by other factory tablet/PC devices):**
-```cmd
-miniserve.exe --spa --index index.html --port 8080 --interfaces 0.0.0.0 .
-```
-
-#### Explanation of Miniserve Flags:
-| Flag | Description |
-| --- | --- |
-| `--spa` | Enables Single Page Application routing (routes all requests to `index.html`). |
-| `--index index.html` | Specifies `index.html` as the default root entry point. |
-| `--port 8080` | Sets the web port (default: 8080). Change to `--port 80` if running as administrator. |
-| `--interfaces 0.0.0.0` | Binds to all network interfaces so other PCs on the factory network can open the app. |
-
-#### Step 4: 1-Click Launch Script for Windows Operators (`run-app.bat`)
-Create a text file named `run-app.bat` inside the app folder with the following content:
-```bat
-@echo off
-title PLMSys Local Server (Miniserve)
-echo Starting PLMSys Local Web Server...
-echo Open http://localhost:8080 in your web browser.
-miniserve.exe --spa --index index.html --port 8080 --interfaces 0.0.0.0 .
-pause
-```
-Operators can simply double-click `run-app.bat` to launch the application server without typing commands.
+- **Operator**: Standard operator role for logging daily production cycles, mounting plates, viewing set statuses, and searching plate histories.
+- **Admin / Supervisor**: Full administrative access for creating sets, editing personnel registry, supervisor sign-offs, database backups, and factory reset operations.
+  - **Default Admin Password**: `JADB1994` (or `admin`)
+  - **Supervisor Sign-off Passwords**: Configured in Personnel Management (default: `JADB1994`, `admin`, `superadmin`, `supervisor`).
 
 ---
 
-### 5. Alternative Server Options (`npx serve`)
-Using standard Node.js:
-```bash
-npx serve dist -s -p 8080
-```
-
----
-
-## 📖 How to Use the Application (User Guide)
-
-### 1. User Roles & Default Passwords
-
-- **Operator**: Standard production personnel capable of logging daily production cycles, viewing set statuses, and searching logs.
-- **Admin / Supervisor**: Full administrative privileges including creating/deleting sets, configuring personnel, approving production logs, backing up/restoring databases, and conducting schema adjustments.
-
-#### Default Credentials:
-- **Admin Login Password**: `admin`
-- **Supervisor Sign-off Passwords**: `admin`, `superadmin`, `supervisor` (or custom passwords configured in Personnel Management).
-
----
-
-### 2. Navigation Overview
-
-The top navigation bar provides instant access to primary operational views:
-- **Dashboard**: High-level overview of active cylinder sets and status counters.
-- **Set Monitoring**: Detailed breakdown of individual cylinder sets, plate positions, and installation statuses.
-- **Daily Production**: Chronological log of shift production outputs and job orders.
-- **Search**: Advanced keyword query tool for plate serial numbers, job orders, and dates.
-- **Audit Logs**: Full operational event history.
-- **Admin Center**: Database backups, factory reset controls, personnel configuration, and DB Studio.
-- **New Set / Log Production**: Quick-action header buttons for common tasks.
-
----
-
-### 3. Managing Cylinder Sets & Positions
+### 2. Cylinder Set & Position Management
 
 1. Click **New Production Set** in the header or dashboard.
-2. Enter the **Set Name** (e.g., `Set A - 8 Color Packaging`), **Number of Positions**, **Target Cycle Count**, and optional notes.
-3. Click **Create Set**.
-4. Open **Set Monitoring** to view the interactive grid of positions for that set.
+2. Enter the **Set Number** (e.g., `1`), **Target Cycle Limit**, and optional notes.
+3. Upon creation, the system automatically initializes **11 fixed position slots (P01 through P11)** and installs initial active plates.
+4. Click any set to open the **Set Monitoring View** with the visual 11-position matrix.
 
 ---
 
-### 4. Installing, Replacing & Removing Mold Plates
+### 3. Installing, Replacing & Retiring/Rejecting Plates
 
-1. In **Set Monitoring**, select a position card (e.g., `Position 1`).
-2. Click **Install Plate**:
-   - Enter the **Plate Serial Number**.
-   - Select the installing **Operator**.
-   - Confirm installation date and initial cycle count.
-3. **Record Plate Replacement**:
-   - When a plate reaches wear limits or suffers damage, click **Replace Plate**.
-   - Input the replacement reason and new plate serial number.
-4. **Remove Plate**:
-   - To remove a plate without immediate replacement, click **Remove Plate** and specify the removal code/reason.
+1. In **Set Monitoring**, click any position slot card (P01–P11).
+2. To replace or decommission an active plate, select **Replace Plate**:
+   - Choose the removal outcome: **RETIRED** (normal end-of-life) or **REJECTED** (defective).
+   - If **REJECTED**, select the defect classification (`Excessive Wear`, `Crack`, `Surface Damage`, `Chipping`, `Dent`, `Dimension Failure`, or `Other`).
+   - Enter detailed **Defect Description**, **Source of Reject**, and **Corrective Action**.
+   - Input or auto-generate the new replacement plate serial number.
+   - Select the installing operator and submit.
+3. All historical installations and removals for that slot are preserved in the **Position History Ledger**.
 
 ---
 
-### 5. Logging Daily Production Cycles
+### 4. Logging Daily Production & Supervisor Sign-Off
 
 1. Click **Log Production** in the navigation bar.
 2. Select the target **Cylinder Set**.
-3. Enter the **Cycles Added** (e.g., `15,000` impressions).
-4. Enter the **Job Order Number** (format: `0000-00`, e.g., `1042-01`).
-5. Select the **Operator Name** and current shift date.
-6. Enter a valid **Supervisor Password** for sign-off verification.
-7. Click **Save Production Log**. The system will automatically update all installed plates on that set with the new cycle count.
+3. Input the **Production Cycles Added** (e.g., `25,000`).
+4. Enter the **Job Order Number** (strictly validated format: `0000-00`, e.g., `1042-01`).
+5. Select the **Operator Name** and current production date.
+6. Enter a valid **Supervisor Password** for quality sign-off authorization.
+7. Click **Save Production Log**. The system automatically increments the total set cycle count and all currently installed plate lifespans.
 
 ---
 
-### 6. Reviewing Daily Production & History
+### 5. Traceability, Plate Search & Audit Trail
 
-- Navigate to the **Daily Production** tab.
-- View production records organized by date, job order, set name, and supervisor approvals.
-- Filter by date range or specific set to analyze shift productivity and machine utilization.
-
----
-
-### 7. Audit Trail & Search
-
-- **Search**: Use the global search bar to locate specific plate serial numbers, job orders, operator names, or set names across the entire system.
-- **Audit Log**: Open the **Audit Logs** tab to review time-stamped logs of all system activities, ensuring full traceability for quality audits.
+- **Global Plate Search**: Open the **Search** tab to query any plate serial number (`MMDDYY-SET-POS`), manufacturing date, or status. View its full lifecycle timeline, which set/position it was mounted on, and why it was retired or rejected.
+- **Daily Production Ledger**: View chronological production logs with previous cycle, added cycles, resulting cycle, operator, supervisor sign-off, and Job Order. Filter by set or operator.
+- **Audit Logs**: Open the **Audit Logs** tab to inspect all logged actions (`AUD-XXXXXX`), timestamps, set/position IDs, operator credentials, and previous vs. updated value diffs.
 
 ---
 
-### 8. Admin Dashboard, Backups & DB Studio
+### 6. Admin Tools, Backups & DB Studio
 
-Click **Admin** in the top navigation bar and enter your Admin password (`admin`).
+Click **Admin** in the navigation bar (Password: `JADB1994`):
 
-#### A. Backups & Restore
-- **Export Backup**: Click **Export Backup** to download a complete `.json` database snapshot.
-- **Import Backup**: Click **Import Backup** to restore data from a previously saved `.json` file.
-- **Factory Reset**: Wipe all data and return to clean factory defaults (requires typing `RESET` to confirm).
-
-#### B. DB & Schema Studio
-- Click the **DB & Schema Studio** sub-tab inside Admin Dashboard.
-- **Inspect Tables**: Select any IndexedDB table (`sets`, `positions`, `plates`, `plateInstallations`, `dailyProduction`, `auditLogs`, etc.) to view raw records.
-- **Run Queries**: Search or filter raw database entries directly.
-- **Modify Records**: Edit or clean up invalid records directly inside the browser DB studio.
+- **Export Backup**: Download a complete JSON snapshot containing all sets, positions, plates, installations, removals, production logs, personnel, and audit trails.
+- **Import Backup**: Restore application state from a JSON backup file.
+- **Factory Reset**: Clear local database state and re-seed defaults (requires typing `"RESET"`).
+- **Database & Schema Studio**: Built-in visual database manager with table inspection, schema DDL viewers, query runners, and MySQL / PostgreSQL `.sql` dump generation.
 
 ---
 
@@ -283,37 +252,49 @@ Click **Admin** in the top navigation bar and enter your Admin password (`admin`
 plmsys/
 ├── .github/
 │   └── workflows/
-│       └── web-app-ci.yml    # CI verification & ZIP packaging workflow
+│       └── web-app-ci.yml    # CI verification & build pipeline
+├── START.bat                 # One-click Windows development launcher
+├── START-PRODUCTION.bat      # One-click Windows production build & launcher
+├── start.sh                  # Linux/macOS launcher
 ├── src/
-│   ├── components/           # UI views, modals, grids, and dashboards
+│   ├── components/           # React UI views, modals, matrices, and dashboards
 │   │   ├── AdminDashboard.tsx
+│   │   ├── AuditLogView.tsx
+│   │   ├── CreateSetModal.tsx
+│   │   ├── DailyProductionView.tsx
 │   │   ├── DatabaseManagerView.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── GlobalSearch.tsx
+│   │   ├── LogProductionModal.tsx
+│   │   ├── Navbar.tsx
+│   │   ├── PositionModal.tsx
+│   │   ├── RegistryModal.tsx
 │   │   ├── SetDetail.tsx
-│   │   └── ...
+│   │   └── TutorialModal.tsx
 │   ├── db/
-│   │   └── db.ts             # IndexedDB / Dexie schema & seed data
-│   ├── App.tsx               # Main application router & state controller
-│   ├── main.tsx              # React entry point
-│   ├── types.ts              # Global TypeScript interface declarations
-│   └── utils.ts              # Helper & formatting utilities
-├── index.html                # Main HTML entry point
-├── server.ts                 # Production Express backend & Vite middleware
-├── package.json              # Project dependencies & scripts
-└── README.md                 # Project documentation & user guide
+│   │   └── db.ts             # Dexie IndexedDB schema, models & initial seeds
+│   ├── App.tsx               # Primary application state, modal routing & handlers
+│   ├── main.tsx              # React DOM root entry point with ErrorBoundary
+│   ├── types.ts              # TypeScript type declarations & defect schemas
+│   └── utils.ts              # Serial number generators & formatters
+├── server.ts                 # Express server with Vite middleware integration
+├── package.json              # Project dependencies, scripts & metadata
+└── README.md                 # Complete documentation & operator guide
 ```
 
 ---
 
-## 🛠 Troubleshooting & FAQs
+## ❓ Frequently Asked Questions (FAQs)
 
-### Q: Where is my data saved?
-All data is stored locally in your browser's **IndexedDB** database (`PlateDatabase`). No data is ever uploaded to external servers.
+### Q: What is the difference between RETIRED and REJECTED plates?
+- **RETIRED plates** have completed their expected production lifecycle without unexpected failure or quality issues.
+- **REJECTED plates** are taken out of service prematurely due to defects (such as cracks, surface damage, chipping, or dimensional failure), requiring root-cause classification and corrective action logging.
 
-### Q: Will clearing browser history delete my data?
-Clearing standard history will NOT delete IndexedDB data. However, selecting **"Clear site data / cookies"** or clearing all site databases in browser developer settings will wipe the IndexedDB storage. **Always export a periodic JSON backup from the Admin Dashboard!**
+### Q: Where is the data stored?
+All data is stored directly in the local browser's **IndexedDB** database (`PlateDatabase`). No data is sent over the public internet, ensuring complete privacy and offline autonomy.
 
-### Q: Can I run this without internet access?
-**Yes!** PLMSys is 100% self-contained. Once the production bundle is built or served locally, it requires zero internet connectivity.
+### Q: How do we prevent data loss when switching computers?
+Use the **Export Backup** feature in the **Admin Dashboard** or **Database Manager** to download a `.json` backup file, then click **Import Backup** on the new computer.
 
-### Q: How do I change the Admin Password?
-You can update passwords and authorized personnel records via **Admin Dashboard** $\rightarrow$ **Personnel Management**, or directly in **DB & Schema Studio** under the `personnel` table.
+### Q: What is the default Admin password?
+The default system supervisor password is **`JADB1994`** (or `admin`). You can manage authorized supervisors and operators in the **Personnel Registry**.

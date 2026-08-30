@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { SetRecord, PositionRecord, PlateRecord } from '../types';
-import { Sliders, Plus, Edit2, Check, X, AlertCircle, ArrowRight, Search } from 'lucide-react';
+import { SetRecord, PositionRecord, PlateRecord, DailyProductionRecord } from '../types';
+import { Sliders, Plus, Edit2, Check, X, AlertCircle, ArrowRight, Search, Activity } from 'lucide-react';
+import { getSetTodayProduction, getTodayStr } from '../utils';
 
 interface ManageSetViewProps {
   sets: SetRecord[];
   positions: PositionRecord[];
   plates: PlateRecord[];
+  dailyProductions?: DailyProductionRecord[];
   onSelectSet: (setId: string) => void;
   onOpenCreateSet: () => void;
   onUpdateSet: (
@@ -21,12 +23,15 @@ export const ManageSetView: React.FC<ManageSetViewProps> = ({
   sets,
   positions,
   plates,
+  dailyProductions = [],
   onSelectSet,
   onOpenCreateSet,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [fromSetFilter, setFromSetFilter] = useState('');
   const [toSetFilter, setToSetFilter] = useState('');
+  const todayStr = getTodayStr();
+
 
   // Filter Sets
   const filteredSets = sets.filter((set) => {
@@ -156,20 +161,30 @@ export const ManageSetView: React.FC<ManageSetViewProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 my-4 bg-[#191D28] p-3 rounded-lg border border-[#1E222A]">
-                  <div>
-                    <div className="text-xs text-[#8E9299] font-medium">Set Total Cycle</div>
-                    <div className="text-lg font-extrabold text-white mt-0.5">
-                      {set.currentTotalCycle.toLocaleString()}
+                {(() => {
+                  const todayProd = getSetTodayProduction(set, dailyProductions, todayStr);
+                  return (
+                    <div className="grid grid-cols-2 gap-3 my-4 bg-[#191D28] p-3 rounded-lg border border-[#1E222A]">
+                      <div>
+                        <div className="text-xs text-[#8E9299] font-medium">Set Total Cycle</div>
+                        <div className="text-lg font-extrabold text-white mt-0.5">
+                          {set.currentTotalCycle.toLocaleString()}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-[#8E9299] font-medium flex items-center justify-between">
+                          <span>Today's Prod</span>
+                          {todayProd > 0 && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                          )}
+                        </div>
+                        <div className={`text-lg font-bold mt-0.5 ${todayProd > 0 ? 'text-sky-400' : 'text-[#8E9299]'}`}>
+                          +{todayProd.toLocaleString()}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[#8E9299] font-medium">Today's Production</div>
-                    <div className="text-lg font-bold text-[#F27D26] mt-0.5">
-                      +{set.todayProduction.toLocaleString()}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Positions indicator */}
                 <div className="flex items-center justify-between text-xs text-[#8E9299] mb-2">

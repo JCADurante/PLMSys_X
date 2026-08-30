@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { SetRecord, PositionRecord, PlateRecord, PlateInstallationRecord, PlateRemovalRecord, User, Personnel } from '../types';
-import { Layers, Activity, Search, Plus, ArrowRight, Sliders, Edit2, Check, X, AlertCircle, CheckCircle2, Calendar, Archive, Clock, TrendingUp, BarChart2 } from 'lucide-react';
-import { getSetTodayProduction } from '../utils';
+import React, { useState, useEffect } from 'react';
+import { SetRecord, PositionRecord, PlateRecord, PlateInstallationRecord, PlateRemovalRecord, DailyProductionRecord, User, Personnel } from '../types';
+import { Layers, Activity, Search, Plus, ArrowRight, Sliders, Edit2, Check, X, AlertCircle, CheckCircle2, Calendar, Archive, Clock, TrendingUp, BarChart2, Radio } from 'lucide-react';
+import { getTodayStr, getNowTimeStr, getTotalTodayProduction, getTodayLogEntriesCount } from '../utils';
 
 interface DashboardProps {
   sets: SetRecord[];
@@ -9,6 +9,7 @@ interface DashboardProps {
   plates: PlateRecord[];
   installations: PlateInstallationRecord[];
   removals: PlateRemovalRecord[];
+  dailyProductions?: DailyProductionRecord[];
   currentUser: User;
   personnel: Personnel[];
   onSelectSet: (setId: string) => void;
@@ -30,6 +31,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   plates,
   installations,
   removals,
+  dailyProductions = [],
   currentUser,
   personnel,
   onSelectSet,
@@ -38,10 +40,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenRegistry,
   onUpdateSet,
 }) => {
+  const [liveTime, setLiveTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const todayStr = getTodayStr(liveTime);
+  const currentTimeStr = getNowTimeStr(liveTime);
+
   const activePlatesCount = plates.filter(p => p.status === 'ACTIVE').length;
   const rejectedPlatesCount = plates.filter(p => p.status === 'REJECTED').length;
   const retiredPlatesCount = plates.filter(p => p.status === 'RETIRED').length;
-  const totalProductionToday = sets.reduce((sum, s) => sum + getSetTodayProduction(s), 0);
+  
+  // Real-time calculation of today's production from actual logs & sets
+  const totalProductionToday = getTotalTodayProduction(sets, dailyProductions, todayStr);
+  const todayEntriesCount = getTodayLogEntriesCount(dailyProductions, todayStr);
 
   // 1. Average Lifespan of Rejected Plates
   const rejectedRemovals = removals.filter(r => r.status === 'REJECTED');
@@ -79,7 +96,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="card shadow-sm border-secondary mb-4">
         <div className="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
           <div>
-            <h2 className="card-title fw-bolder text-light mb-0">Plate Lifecycle & Set Operations</h2>
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <h2 className="card-title fw-bolder text-light mb-0">Plate Lifecycle & Set Operations</h2>
+              <span className="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 d-inline-flex align-items-center gap-1.5 px-2 py-1 text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Real-Time Live
+              </span>
+            </div>
+            <p className="text-secondary small mb-0 font-mono">
+              System Time: <span className="text-light fw-bold">{currentTimeStr}</span> · Shift Date: <span className="text-light fw-bold">{todayStr}</span>
+            </p>
           </div>
           <div className="d-flex align-items-center gap-3 flex-wrap">
             {currentUser.role === 'ADMIN' && (
@@ -108,8 +134,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Metrics Section: Operational Counts */}
       <div className="mb-4">
-        <div className="text-muted small fw-bold text-uppercase tracking-wider mb-3 d-flex align-items-center gap-2">
-          <BarChart2 className="w-4 h-4 text-primary" /> Operational Plate Metrics
+        <div className="text-muted small fw-bold text-uppercase tracking-wider mb-3 d-flex align-items-center justify-content-between">
+          <span className="d-flex align-items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-primary" /> Operational Plate Metrics
+          </span>
+          <span className="text-emerald-400 text-xs font-mono d-inline-flex align-items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> Live Sync Active
+          </span>
         </div>
         <div className="row g-3">
           <div className="col-12 col-sm-6 col-lg-3">
@@ -128,14 +159,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="col-12 col-sm-6 col-lg-3">
-            <div className="card h-100 shadow-sm border-secondary bg-dark-subtle">
-              <div className="card-body d-flex justify-content-between align-items-start">
+            <div className="card h-100 shadow-sm border-info bg-dark-subtle position-relative overflow-hidden">
+              <div className="position-absolute top-0 end-0 px-2 py-0.5 bg-info/20 text-info border-bottom-start rounded-bl text-[10px] font-mono fw-bold d-flex align-items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-info animate-pulse" /> LIVE TODAY
+              </div>
+              <div className="card-body d-flex justify-content-between align-items-start pt-3">
                 <div>
-                  <div className="text-muted small fw-semibold text-uppercase">Today's Production</div>
+                  <div className="text-info small fw-bold text-uppercase d-flex align-items-center gap-1">
+                    Today's Production
+                  </div>
                   <div className="fs-3 fw-bolder text-info mt-1">+{totalProductionToday.toLocaleString()}</div>
-                  <div className="text-muted small mt-1">Cycles added across all Sets</div>
+                  <div className="text-muted small mt-1 font-mono">
+                    {todayEntriesCount > 0 ? (
+                      <span className="text-sky-300">
+                        {todayEntriesCount} {todayEntriesCount === 1 ? 'log' : 'logs'} recorded today
+                      </span>
+                    ) : (
+                      <span>0 cycles logged today yet</span>
+                    )}
+                  </div>
                 </div>
-                <div className="p-2 bg-info bg-opacity-10 rounded text-info">
+                <div className="p-2 bg-info bg-opacity-10 rounded text-info mt-2">
                   <Activity className="w-5 h-5" />
                 </div>
               </div>

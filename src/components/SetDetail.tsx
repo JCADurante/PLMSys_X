@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { SetRecord, PositionRecord, PlateRecord, JobOrderRecord, PlateInstallationRecord, DailyProductionRecord, Personnel } from '../types';
-import { ArrowLeft, Activity, Plus, Wrench, Trash2, RefreshCw, CheckCircle, AlertTriangle, ShieldCheck, Calendar, User, ChevronLeft, ChevronRight, Layers, Lock, X, AlertCircle } from 'lucide-react';
-import { formatJobOrder, isValidJobOrder, getSetTodayProduction } from '../utils';
+import { ArrowLeft, Activity, Plus, Wrench, Trash2, RefreshCw, CheckCircle, AlertTriangle, ShieldCheck, Calendar, User, ChevronLeft, ChevronRight, Layers, Lock, X, AlertCircle, Clock } from 'lucide-react';
+import { formatJobOrder, isValidJobOrder, getSetTodayProduction, getTodayStr, getNowTimeStr } from '../utils';
 
 interface SetDetailProps {
-  setRecord: SetRecord;
   sets?: SetRecord[];
+  setRecord: SetRecord;
   positions: PositionRecord[];
   plates: PlateRecord[];
   installations: PlateInstallationRecord[];
@@ -34,7 +34,21 @@ export const SetDetail: React.FC<SetDetailProps> = ({
   onOpenPositionModal,
   onDeleteSet,
 }) => {
+  const [liveTime, setLiveTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const todayStr = getTodayStr(liveTime);
+  const todaySetProduction = getSetTodayProduction(setRecord, dailyProductions, todayStr);
+  const todayLogsForSet = dailyProductions.filter(dp => dp.setId === setRecord.id && dp.date === todayStr);
+
   const [productionCyclesInput, setProductionCyclesInput] = useState(() => localStorage.getItem('draft_set_productionCyclesInput') || '');
+
   const [jobOrderInput, setJobOrderInput] = useState(() => localStorage.getItem('draft_set_jobOrderInput') || '');
   const [operatorNameInput, setOperatorNameInput] = useState(() => localStorage.getItem('draft_set_operatorNameInput') || '');
   const [checkedByInput, setCheckedByInput] = useState('');
@@ -283,9 +297,22 @@ export const SetDetail: React.FC<SetDetailProps> = ({
                   <span className="text-[#F27D26] font-bold">Auto Sum:</span> {initialSetCycle.toLocaleString()} (Starting) + {setDailyLogsCycles.toLocaleString()} (Daily Logs)
                 </div>
               </div>
-              <div className="bg-[#191D28] p-3 rounded-xl border border-[#1E222A]">
-                <div className="text-[#8E9299] text-xs font-medium uppercase">Today's Production</div>
-                <div className="text-2xl sm:text-3xl font-bold text-sky-400 mt-1">+{getSetTodayProduction(setRecord).toLocaleString()}</div>
+              <div className="bg-[#191D28] p-3 rounded-xl border border-sky-500/30 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-2 right-2 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                  <span className="text-[9px] font-mono text-sky-400 uppercase font-bold">LIVE</span>
+                </div>
+                <div>
+                  <div className="text-sky-400 text-xs font-medium uppercase">Today's Production</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-sky-400 mt-1">+{todaySetProduction.toLocaleString()}</div>
+                </div>
+                <div className="text-[10px] text-[#8E9299] mt-2 pt-1 border-t border-[#1E222A] font-mono">
+                  {todayLogsForSet.length > 0 ? (
+                    <span className="text-sky-300 font-semibold">{todayLogsForSet.length} log {todayLogsForSet.length === 1 ? 'entry' : 'entries'} today</span>
+                  ) : (
+                    <span>0 logs recorded today</span>
+                  )}
+                </div>
               </div>
               <div className="bg-[#191D28] p-3 rounded-xl border border-[#1E222A]">
                 <div className="text-[#8E9299] text-xs font-medium uppercase">Active Plates</div>
