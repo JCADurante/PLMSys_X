@@ -1,5 +1,4 @@
 @echo off
-setlocal enabledelayedexpansion
 TITLE PLMSys - Plate Lifecycle Monitoring System
 cd /d "%~dp0"
 
@@ -8,7 +7,7 @@ ECHO         PLMSys - Plate Lifecycle Monitoring System
 ECHO ============================================================
 ECHO.
 
-:: 1. Check if user is running directly inside an unextracted ZIP
+:: 1. Check if unextracted ZIP
 if not exist "package.json" (
     ECHO [ERROR] package.json not found in the current directory!
     ECHO.
@@ -24,69 +23,74 @@ if not exist "package.json" (
     EXIT /B 1
 )
 
-:: 2. Check if Node.js is in PATH or standard installation directories
+:: 2. Check Node.js in PATH
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    if exist "%ProgramFiles%\nodejs\node.exe" (
-        set "PATH=%ProgramFiles%\nodejs;%PATH%"
-    ) else if exist "%ProgramFiles(x86)%\nodejs\node.exe" (
-        set "PATH=%ProgramFiles(x86)%\nodejs;%PATH%"
-    ) else if exist "%LOCALAPPDATA%\Programs\node\node.exe" (
-        set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
-    )
+    if exist "C:\Program Files\nodejs\node.exe" set "PATH=C:\Program Files\nodejs;%PATH%"
+    if exist "C:\Program Files (x86)\nodejs\node.exe" set "PATH=C:\Program Files (x86)\nodejs;%PATH%"
+    if exist "%LOCALAPPDATA%\Programs\node\node.exe" set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
 )
 
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    ECHO [ERROR] Node.js is not installed or not found in system PATH.
+    ECHO ============================================================
+    ECHO [ERROR] Node.js is NOT installed on this computer!
+    ECHO ============================================================
     ECHO.
-    ECHO To run the full development server:
-    ECHO 1. Download and install Node.js (LTS version) from: https://nodejs.org/
-    ECHO 2. During installation, ensure "Add to PATH" is checked.
-    ECHO 3. Restart this batch file after installation.
+    ECHO Node.js is required to run the centralized server.
     ECHO.
-    ECHO TIP: If you want to run PLMSys without installing Node.js,
-    ECHO      you can double-click "START-MINISERVE.bat" instead!
+    ECHO QUICK FIX:
+    ECHO 1. Download and install Node.js (LTS version) from:
+    ECHO    https://nodejs.org/
+    ECHO 2. During installation, make sure "Add to PATH" is checked.
+    ECHO 3. After installing Node.js, double-click START.bat again.
     ECHO.
     PAUSE
     EXIT /B 1
 )
 
-:: 3. Check if node_modules directory exists
+ECHO [OK] Node.js is installed!
+node -v
+ECHO.
+
+:: 3. Check dependencies
 if not exist "node_modules\" (
-    ECHO [INFO] First-time setup detected. Installing dependencies...
-    ECHO This may take 1-2 minutes depending on your internet connection...
+    ECHO [INFO] First-time setup: Installing required packages...
+    ECHO Please wait 1-2 minutes...
     ECHO.
     CALL npm install
-    if !errorlevel! neq 0 (
+    if %errorlevel% neq 0 (
         ECHO.
         ECHO [ERROR] Dependency installation failed!
-        ECHO Please check your internet connection and try running 'npm install' manually.
+        ECHO Please check your internet connection or run 'npm install' in Command Prompt.
         ECHO.
         PAUSE
         EXIT /B 1
     )
     ECHO.
-    ECHO [SUCCESS] Dependencies installed successfully!
+    ECHO [OK] Packages installed successfully!
     ECHO.
 )
 
-:: 4. Launch browser in background
-ECHO [INFO] Starting PLMSys Local Web Server on http://localhost:3000 ...
+:: 4. Show Network IP
+ECHO ============================================================
+ECHO  Local Area Network (LAN) IP Addresses:
+ipconfig | findstr /i "IPv4"
+ECHO ============================================================
+ECHO.
+ECHO Starting PLMSys Central Server on http://localhost:3000 ...
+ECHO Other devices on LAN can open: http://<YOUR-IP>:3000
+ECHO.
+
+:: 5. Launch browser
 start "" "http://localhost:3000"
 
-:: 5. Start the application
-ECHO.
-ECHO ============================================================
-ECHO  PLMSys is running! Keep this window open while using the app.
-ECHO  To stop the server, press Ctrl+C in this window.
-ECHO ============================================================
-ECHO.
+:: 6. Run Server
 CALL npm run dev
 
 if %errorlevel% neq 0 (
     ECHO.
-    ECHO [WARNING] Server stopped with exit code %errorlevel%.
+    ECHO [WARNING] Server stopped.
 )
 
 PAUSE
