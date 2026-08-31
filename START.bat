@@ -9,8 +9,8 @@ ECHO ============================================================
 ECHO.
 
 :: 1. Check if unextracted ZIP
-if not exist "server.js" (
-    ECHO [ERROR] server.js not found in current folder!
+if not exist "package.json" (
+    ECHO [ERROR] package.json not found in current folder!
     ECHO Please make sure you have extracted all files from the ZIP.
     ECHO.
     PAUSE
@@ -47,7 +47,42 @@ ECHO [OK] Node.js is ready:
 node -v
 ECHO.
 
-:: 3. Show Network IP
+:: 3. Check if node_modules exists (install if missing)
+if not exist "node_modules\" (
+    ECHO [INFO] First-time setup: Installing required libraries...
+    ECHO This may take 1-2 minutes. Please wait...
+    ECHO.
+    call npm install
+    if %errorlevel% neq 0 (
+        ECHO.
+        ECHO [ERROR] Failed to install packages via npm.
+        ECHO Please ensure your computer is connected to the internet.
+        ECHO.
+        PAUSE
+        EXIT /B 1
+    )
+    ECHO [OK] Packages installed!
+    ECHO.
+)
+
+:: 4. Check if dist folder exists (build if missing)
+if not exist "dist\index.html" (
+    ECHO [INFO] Building the production website files (dist folder)...
+    ECHO Please wait a few seconds...
+    ECHO.
+    call npm run build
+    if %errorlevel% neq 0 (
+        ECHO.
+        ECHO [ERROR] Build step failed.
+        ECHO.
+        PAUSE
+        EXIT /B 1
+    )
+    ECHO [OK] Production dist folder built successfully!
+    ECHO.
+)
+
+:: 5. Show Network IP
 ECHO ============================================================
 ECHO  Local Area Network (LAN) IP Addresses:
 ipconfig | findstr /i "IPv4"
@@ -57,10 +92,10 @@ ECHO Starting PLMSys Central Server on http://localhost:3000 ...
 ECHO Other tablets and PCs on Wi-Fi can open: http://^<YOUR-IP^>:3000
 ECHO.
 
-:: 4. Launch browser
+:: 6. Launch browser
 start "" "http://localhost:3000"
 
-:: 5. Run Central Node Server (Zero dependencies required!)
+:: 7. Run Central Node Server
 node server.js
 
 if %errorlevel% neq 0 (
