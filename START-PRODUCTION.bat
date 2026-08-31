@@ -24,14 +24,14 @@ if not exist "package.json" (
 )
 
 :: 2. Check if Node.js is installed
-where node >nul 2>nul
+node -v >nul 2>nul
 if %errorlevel% neq 0 (
     if exist "C:\Program Files\nodejs\node.exe" set "PATH=C:\Program Files\nodejs;%PATH%"
-    if exist "C:\Program Files (x86)\nodejs\node.exe" set "PATH=C:\Program Files (x86)\nodejs;%PATH%"
     if exist "%LOCALAPPDATA%\Programs\node\node.exe" set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
+    if exist "%ProgramFiles%\nodejs\node.exe" set "PATH=%ProgramFiles%\nodejs;%PATH%"
 )
 
-where node >nul 2>nul
+node -v >nul 2>nul
 if %errorlevel% neq 0 (
     ECHO [ERROR] Node.js is NOT installed or not found in system PATH.
     ECHO Please install Node.js (v18 or higher) from https://nodejs.org/

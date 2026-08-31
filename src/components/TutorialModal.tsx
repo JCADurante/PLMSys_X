@@ -94,11 +94,11 @@ const steps: TutorialStep[] = [
     tip: 'Requires Admin authentication credentials.'
   },
   {
-    title: 'Miniserve LAN & Offline Server',
+    title: 'Central LAN Server & Multi-Device Sync',
     tab: 'admin',
     icon: <Database className="w-6 h-6 text-emerald-400" />,
-    description: 'Host PLMSys across shop-floor PCs and tablets with zero dependencies using Miniserve v0.35.0. Access the Miniserve LAN Server tab in Admin Control Center to configure ports, download one-click launchers, and generate firewall rules.',
-    tip: 'No Node.js installation required on factory client computers.'
+    description: 'Host PLMSys across shop-floor PCs, touchscreen consoles, and mobile tablets using the centralized Node server (START.bat). Real-time updates automatically synchronize across all devices on your Wi-Fi/LAN.',
+    tip: 'Ensure your host PC Wi-Fi network profile is set to Private.'
   }
 ];
 

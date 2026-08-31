@@ -41,7 +41,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
       });
       if (onClose) onClose();
     } else {
-      setError('Invalid password. Default admin password is JADB1994.');
+      setError('Invalid administrator password.');
       setTimeout(() => setError(''), 3000);
     }
   };
@@ -102,7 +102,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
               </button>
             </div>
           ) : (
-            /* Admin Password Form */
+            /* Admin Password Form without password suggestion */
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="flex items-center gap-2 text-xs font-bold text-[#F27D26] uppercase tracking-wider">
                 <Lock className="w-4 h-4" />
@@ -121,7 +121,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
                 </label>
                 <input
                   type="password"
-                  placeholder="Enter Admin Password (e.g. JADB1994)"
+                  placeholder="Enter administrator password"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
                   className="w-full p-3 bg-[#141720] text-white rounded-lg border border-[#1E222A] focus:border-[#F27D26] text-xs outline-none"

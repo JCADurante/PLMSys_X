@@ -17,9 +17,8 @@ The system tracks the complete operational history of every laminating plate: in
 - [System Requirements](#-system-requirements)
 - [Quick Start & Setup Guide](#-quick-start--setup-guide)
   - [⚡ One-Click Windows Launchers](#-one-click-windows-launchers)
+  - [Centralized LAN Server & Multi-Device Setup](#centralized-lan-server--multi-device-setup)
   - [Manual Setup (Development)](#manual-development-setup)
-  - [Production Setup & Start](#production-setup--start)
-  - [Zero-Install Miniserve Setup (LAN / Factory PC)](#zero-install-miniserve-setup-lan--factory-pc)
 - [User Guide](#-user-guide)
   - [1. Roles & Credentials](#1-roles--credentials)
   - [2. Cylinder Set & Position Management](#2-cylinder-set--position-management)
@@ -120,15 +119,41 @@ Example: 082926-01-05 (Manufactured Aug 29, 2026, for Set 01, Position P05)
 
 ## 🚀 Quick Start & Setup Guide
 
-### ⚡ One-Click Launchers (Windows, Linux, macOS)
+### ⚡ One-Click Launchers (Windows & Linux)
 
-Executable scripts are provided in the root directory for shop-floor operators and supervisors:
+Executable scripts are provided in the root directory:
 
-- **`START-MINISERVE.bat`** *(NEW)*: High-performance, zero-install launcher using the latest **Miniserve v0.35.0**. Automatically downloads `miniserve.exe` if not found, binds to `0.0.0.0:3000` for full Local Area Network (LAN) tablet connectivity, and opens the browser.
-- **`start-miniserve.sh`** *(NEW)*: Linux/macOS high-performance Miniserve launcher (`./start-miniserve.sh`).
-- **`START.bat`**: Development server launcher with automatic Node.js dependency checks and live browser launch.
-- **`START-PRODUCTION.bat`**: Compiles a fresh production bundle (`npm run build`) and starts the Express production server.
-- **`start.sh`**: Shell development launcher for Linux and macOS environments (`./start.sh`).
+- **`START.bat`**: Primary Windows launcher. Starts the centralized Node.js server, binds to `0.0.0.0:3000`, displays your local Wi-Fi IP address, and automatically opens the browser.
+- **`INSTALL-AND-RUN.bat`**: Automated first-time setup launcher (runs `npm install`, `npm run build`, and launches the central server).
+- **`CHECK-NETWORK.bat`**: Network profile checker & 1-click switcher (checks Public vs Private Wi-Fi status and adds port 3000 firewall allowance).
+- **`DIAGNOSE.bat`**: Windows system diagnostics tool to inspect Node.js and network connectivity.
+- **`START-PRODUCTION.bat`**: Compiles the latest production build and launches the server.
+- **`start.sh`**: Shell launcher for Linux and macOS environments (`./start.sh`).
+
+---
+
+### Centralized LAN Server & Multi-Device Setup
+
+PLMSys operates with a centralized server architecture. When you run `START.bat` or `node server.js`:
+
+1. **Host Computer**:
+   Open your browser to:
+   ```text
+   http://localhost:3000
+   ```
+
+2. **Connecting Phones, Tablets & Shop-Floor PCs**:
+   - Ensure devices are connected to the same Wi-Fi/LAN network.
+   - On the Windows host PC, verify that the Wi-Fi network profile is set to **Private** (`Settings -> Wi-Fi -> Properties -> Private network`).
+   - Open Windows Firewall port 3000 if needed (PowerShell as Admin):
+     ```powershell
+     New-NetFirewallRule -DisplayName "PLMSys Server Port 3000" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+     ```
+   - On any phone or tablet, navigate to your host PC's IP address:
+     ```text
+     http://<HOST_IP>:3000
+     ```
+   - All production updates, plate swaps, and audits synchronize live to `data/plmsys_database.json`!
 
 ---
 
@@ -152,80 +177,6 @@ Executable scripts are provided in the root directory for shop-floor operators a
 
 4. **Open in Browser**:
    Navigate to `http://localhost:3000`.
-
----
-
-### Production Setup & Start
-
-1. **Build the Production Bundle**:
-   ```bash
-   npm run build
-   ```
-   *Compiles the Vite static frontend into `dist/` and bundles `server.ts` into `dist/server.cjs`.*
-
-2. **Start Production Server**:
-   ```bash
-   npm start
-   ```
-   *The Express server serves the static application on `http://localhost:3000`.*
-
----
-
-### 🌐 Zero-Install Miniserve Setup (LAN / Factory Air-Gapped PCs)
-
-For air-gapped shop-floor PCs, touchscreen consoles, and tablets without Node.js installed, use the latest [**Miniserve v0.35.0**](https://github.com/svenstaro/miniserve):
-
-#### 1. Automated 1-Click Launch (Windows)
-Double-click **`START-MINISERVE.bat`**. The script will:
-- Check for `miniserve.exe` (and automatically download it via PowerShell if missing)
-- Build the production bundle into `dist/` if not present
-- Display your machine's local IPv4 network address
-- Launch Miniserve on `http://0.0.0.0:3000` in Single-Page Application (SPA) mode
-- Open your browser to `http://localhost:3000`
-
-#### 2. Manual Miniserve Installation & Launch
-
-**Download Binaries (Miniserve v0.35.0):**
-- **Windows (x86_64)**: [miniserve-v0.35.0-x86_64-pc-windows-msvc.exe](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-pc-windows-msvc.exe) *(rename to `miniserve.exe`)*
-- **Linux (x86_64)**: [miniserve-v0.35.0-x86_64-unknown-linux-musl](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-unknown-linux-musl)
-- **macOS (Apple Silicon)**: [miniserve-v0.35.0-aarch64-apple-darwin](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-aarch64-apple-darwin)
-- **macOS (Intel)**: [miniserve-v0.35.0-x86_64-apple-darwin](https://github.com/svenstaro/miniserve/releases/download/v0.35.0/miniserve-v0.35.0-x86_64-apple-darwin)
-
-**Package Managers:**
-```bash
-# Windows (winget)
-winget install svenstaro.miniserve
-
-# Rust Cargo
-cargo install miniserve
-
-# macOS Homebrew
-brew install miniserve
-```
-
-**Run Miniserve Command:**
-```cmd
-# Standard Production SPA Server (LAN Enabled on port 3000)
-miniserve --spa --index index.html --port 3000 --interfaces 0.0.0.0 dist
-
-# With HTTP Basic Authentication
-miniserve --spa --index index.html --port 3000 --auth admin:JADB1994 --interfaces 0.0.0.0 dist
-```
-
-#### 3. Connecting Factory Tablets / LAN Client Devices
-1. Ensure the host computer and client tablets/PCs are on the same local network (Wi-Fi or Ethernet).
-2. Open Windows Firewall port 3000 if prompted, or run in Administrator PowerShell/CMD:
-   ```cmd
-   netsh advfirewall firewall add rule name="PLMSys Miniserve" dir=in action=allow protocol=TCP localport=3000
-   ```
-3. Find the host IP address with `ipconfig` (e.g., `192.168.1.100`).
-4. On any tablet or shop-floor device, open:
-   ```
-   http://192.168.1.100:3000
-   ```
-
-#### 4. In-App Miniserve Hub
-Administrators can also navigate to **Admin Control Center** > **Miniserve LAN Server** inside PLMSys to access the interactive live command configurator, generate custom ports, and download batch scripts directly.
 
 ---
 
