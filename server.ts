@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 import cors from 'cors';
 import { createServer as createViteServer } from 'vite';
 
@@ -10,8 +12,15 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// In-memory / server-side state for local web app synchronization
-let serverDb: {
+// -------------------------------------------------------------
+// Persistent Storage Engine (data/plmsys_database.json)
+// -------------------------------------------------------------
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'plmsys_database.json');
+
+interface ServerDatabase {
+  revision: number;
+  lastUpdated: string;
   sets: any[];
   positions: any[];
   plates: any[];
@@ -23,7 +32,11 @@ let serverDb: {
   auditLogs: any[];
   personnel: any[];
   networkSettings: any;
-} = {
+}
+
+let serverDb: ServerDatabase = {
+  revision: 1,
+  lastUpdated: new Date().toISOString(),
   sets: [],
   positions: [],
   plates: [],
@@ -42,114 +55,232 @@ let serverDb: {
     { id: 'pers-3', fullName: 'Administrator', shortName: 'Admin', position: 'Admin', isAuthorized: true, password: 'JADB1994' }
   ],
   networkSettings: {
-    mode: 'LOCAL',
+    mode: 'CENTRAL_SERVER',
     networkPath: '',
-    serverHost: 'localhost',
-    serverPort: 3000,
+    serverHost: '0.0.0.0',
+    serverPort: PORT,
     isHost: true,
     revision: 1,
     status: 'CONNECTED'
   }
 };
 
-// Initialize default SET 01 & SET 02 if empty
-function initDefaultSets() {
-  if (serverDb.sets.length === 0) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const nowObj = new Date();
-    const mm = String(nowObj.getMonth() + 1).padStart(2, '0');
-    const dd = String(nowObj.getDate()).padStart(2, '0');
-    const yy = String(nowObj.getFullYear()).slice(-2);
-    const dateFormatted = `${mm}${dd}${yy}`;
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
-    for (let i = 1; i <= 2; i++) {
-      const setId = `set-${i}`;
-      const shortCode = `S0${i}`;
-      serverDb.sets.push({
-        id: setId,
-        setNumber: i,
-        displayName: `SET 0${i}`,
-        shortCode,
+// Save database to disk
+function persistDatabase() {
+  try {
+    serverDb.revision = (serverDb.revision || 0) + 1;
+    serverDb.lastUpdated = new Date().toISOString();
+    fs.writeFileSync(DB_FILE, JSON.stringify(serverDb, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[PLMSys Server] Failed to persist database to disk:', err);
+  }
+}
+
+// Load database from disk or initialize default sets
+function loadOrInitDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.sets)) {
+        serverDb = { ...serverDb, ...parsed };
+        console.log(`[PLMSys Server] Loaded persistent database (Revision: ${serverDb.revision}, Sets: ${serverDb.sets.length}, Plates: ${serverDb.plates.length})`);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('[PLMSys Server] Could not read database file, initializing defaults:', err);
+  }
+
+  // Initialize default SET 01 & SET 02
+  const todayStr = new Date().toISOString().split('T')[0];
+  const nowObj = new Date();
+  const mm = String(nowObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(nowObj.getDate()).padStart(2, '0');
+  const yy = String(nowObj.getFullYear()).slice(-2);
+  const dateFormatted = `${mm}${dd}${yy}`;
+
+  for (let i = 1; i <= 2; i++) {
+    const setId = `set-${i}`;
+    const shortCode = `S0${i}`;
+    serverDb.sets.push({
+      id: setId,
+      setNumber: i,
+      displayName: `SET 0${i}`,
+      shortCode,
+      status: 'ACTIVE',
+      currentTotalCycle: 0,
+      initialCycle: 0,
+      todayProduction: 0,
+      lastProductionDate: todayStr,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    for (let p = 1; p <= 11; p++) {
+      const pNumStr = p < 10 ? `0${p}` : `${p}`;
+      const posCode = `P${pNumStr}`;
+      const fullCode = `${shortCode}-${posCode}`;
+      const plateId = `plate-${i}-${p}`;
+      const serial = `${dateFormatted}-0${i}-${pNumStr}`;
+      const posId = `pos-${i}-${p}`;
+
+      serverDb.plates.push({
+        id: plateId,
+        plateSerialNumber: serial,
+        manufacturingDate: todayStr,
         status: 'ACTIVE',
-        currentTotalCycle: 0,
-        initialCycle: 0,
-        todayProduction: 0,
-        lastProductionDate: todayStr,
+        currentSetId: setId,
+        currentPositionId: posId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
 
-      for (let p = 1; p <= 11; p++) {
-        const pNumStr = p < 10 ? `0${p}` : `${p}`;
-        const posCode = `P${pNumStr}`;
-        const fullCode = `${shortCode}-${posCode}`;
-        const plateId = `plate-${i}-${p}`;
-        const serial = `${dateFormatted}-0${i}-${pNumStr}`;
-        const posId = `pos-${i}-${p}`;
+      serverDb.positions.push({
+        id: posId,
+        setId,
+        setNumber: i,
+        positionNumber: p,
+        positionCode: posCode,
+        fullCode,
+        status: 'OCCUPIED',
+        currentPlateId: plateId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
 
-        serverDb.plates.push({
-          id: plateId,
-          plateSerialNumber: serial,
-          manufacturingDate: todayStr,
-          status: 'ACTIVE',
-          currentSetId: setId,
-          currentPositionId: posId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-
-        serverDb.positions.push({
-          id: posId,
-          setId,
-          setNumber: i,
-          positionNumber: p,
-          positionCode: posCode,
-          fullCode,
-          status: 'OCCUPIED',
-          currentPlateId: plateId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-
-        serverDb.installations.push({
-          id: `inst-${i}-${p}`,
-          plateId,
-          setId,
-          positionId: posId,
-          installationDate: todayStr,
-          installationCycle: 0,
-          initialCycles: 0,
-          operatorId: 'Admin',
-          remarks: 'Factory Setup',
-          createdAt: new Date().toISOString()
-        });
-      }
+      serverDb.installations.push({
+        id: `inst-${i}-${p}`,
+        plateId,
+        setId,
+        positionId: posId,
+        installationDate: todayStr,
+        installationCycle: 0,
+        initialCycles: 0,
+        operatorId: 'Admin',
+        remarks: 'Factory Setup',
+        createdAt: new Date().toISOString()
+      });
     }
   }
+
+  persistDatabase();
 }
-initDefaultSets();
+
+loadOrInitDatabase();
 
 // -------------------------------------------------------------
-// REST API Routes (Matching PHP 8 Backend specifications)
+// REST API Endpoints & Real-Time LAN Synchronization
 // -------------------------------------------------------------
 
-// 1. Health & Status
+// 1. Health & Server Info
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     system: 'Plate Lifecycle Monitoring System (PLMSys)',
-    webApp: 'Local Web App (TypeScript + Bootstrap 5 Frontend / PHP 8 & Node Backend)',
+    webApp: 'Centralized Full-Stack Node.js Web Server',
     timestamp: new Date().toISOString(),
-    databaseEngines: ['MySQL 8.0+', 'PostgreSQL 14+', 'IndexedDB (Browser)', 'In-Memory API Proxy']
+    revision: serverDb.revision,
+    databaseEngines: ['Local JSON Database (Persistent)', 'IndexedDB (Browser Client Cache)', 'MySQL/Postgres Ready']
   });
 });
 
-// 2. Database Status & Diagnostics
+// 2. Server Network Info & Host Addresses
+app.get('/api/server-info', (req: Request, res: Response) => {
+  const nets = os.networkInterfaces();
+  const addresses: string[] = [];
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.family === 'IPv4' && !net.internal) {
+        addresses.push(net.address);
+      }
+    }
+  }
+
+  res.json({
+    success: true,
+    port: PORT,
+    revision: serverDb.revision,
+    localIps: addresses,
+    urls: addresses.map(ip => `http://${ip}:${PORT}`)
+  });
+});
+
+// 3. Sync Version Check (Ultra-lightweight for 3.5s polling)
+app.get('/api/sync/version', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    revision: serverDb.revision || 1,
+    lastUpdated: serverDb.lastUpdated,
+    counts: {
+      sets: serverDb.sets.length,
+      positions: serverDb.positions.length,
+      plates: serverDb.plates.length,
+      production: serverDb.production.length,
+      auditLogs: serverDb.auditLogs.length
+    }
+  });
+});
+
+// 4. Full Database Sync (GET: Download central database / POST: Push client updates)
+app.get('/api/sync/all', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    revision: serverDb.revision || 1,
+    lastUpdated: serverDb.lastUpdated,
+    data: {
+      sets: serverDb.sets,
+      positions: serverDb.positions,
+      plates: serverDb.plates,
+      installations: serverDb.installations,
+      removals: serverDb.removals,
+      production: serverDb.production,
+      replacements: serverDb.replacements,
+      jobOrders: serverDb.jobOrders,
+      auditLogs: serverDb.auditLogs,
+      personnel: serverDb.personnel
+    }
+  });
+});
+
+app.post('/api/sync/all', (req: Request, res: Response) => {
+  const { data } = req.body;
+  if (data) {
+    if (Array.isArray(data.sets)) serverDb.sets = data.sets;
+    if (Array.isArray(data.positions)) serverDb.positions = data.positions;
+    if (Array.isArray(data.plates)) serverDb.plates = data.plates;
+    if (Array.isArray(data.installations)) serverDb.installations = data.installations;
+    if (Array.isArray(data.removals)) serverDb.removals = data.removals;
+    if (Array.isArray(data.production)) serverDb.production = data.production;
+    if (Array.isArray(data.replacements)) serverDb.replacements = data.replacements;
+    if (Array.isArray(data.jobOrders)) serverDb.jobOrders = data.jobOrders;
+    if (Array.isArray(data.auditLogs)) serverDb.auditLogs = data.auditLogs;
+    if (Array.isArray(data.personnel)) serverDb.personnel = data.personnel;
+
+    persistDatabase();
+    console.log(`[PLMSys Server] Database synced from client. New Revision: ${serverDb.revision}`);
+  }
+
+  res.json({
+    success: true,
+    revision: serverDb.revision,
+    lastUpdated: serverDb.lastUpdated,
+    message: 'Database synced and persisted to disk successfully'
+  });
+});
+
+// 5. Database Status & Diagnostics
 app.get('/api/db/status', (req: Request, res: Response) => {
   res.json({
     success: true,
-    driver: 'mysql_or_postgres',
-    activeMode: 'LOCAL_WEB_APP',
+    driver: 'persistent_json_and_indexeddb',
+    activeMode: 'CENTRAL_NODE_SERVER',
+    revision: serverDb.revision,
     tables: {
       sets: serverDb.sets.length,
       positions: serverDb.positions.length,
@@ -163,20 +294,21 @@ app.get('/api/db/status', (req: Request, res: Response) => {
     },
     lockDiagnostics: {
       locked: false,
-      owner: 'Web Client Local Worker',
+      owner: 'Central Node.js Server',
       operation: 'Idle',
-      started: new Date().toISOString(),
+      started: serverDb.lastUpdated,
       heartbeat: new Date().toISOString(),
       status: 'HEALTHY'
     }
   });
 });
 
-// 3. Live SQL Export for MySQL
+// 6. Live SQL Export for MySQL
 app.get('/api/db/export/mysql', (req: Request, res: Response) => {
   let sql = `-- ==========================================================\n`;
   sql += `-- PLMSys Live MySQL 8.0+ Export\n`;
   sql += `-- Generated: ${new Date().toISOString()}\n`;
+  sql += `-- Revision: ${serverDb.revision}\n`;
   sql += `-- ==========================================================\n\n`;
   sql += `SET FOREIGN_KEY_CHECKS = 0;\n\n`;
 
@@ -214,11 +346,12 @@ app.get('/api/db/export/mysql', (req: Request, res: Response) => {
   res.send(sql);
 });
 
-// 4. Live SQL Export for PostgreSQL
+// 7. Live SQL Export for PostgreSQL
 app.get('/api/db/export/postgres', (req: Request, res: Response) => {
   let sql = `-- ==========================================================\n`;
   sql += `-- PLMSys Live PostgreSQL 14+ Export\n`;
   sql += `-- Generated: ${new Date().toISOString()}\n`;
+  sql += `-- Revision: ${serverDb.revision}\n`;
   sql += `-- ==========================================================\n\n`;
 
   if (serverDb.sets.length > 0) {
@@ -234,30 +367,7 @@ app.get('/api/db/export/postgres', (req: Request, res: Response) => {
   res.send(sql);
 });
 
-// 5. Query execution simulator / runner
-app.post('/api/db/query', (req: Request, res: Response) => {
-  const { query } = req.body;
-  if (!query) {
-    res.status(400).json({ success: false, error: 'Query parameter is required' });
-    return;
-  }
-
-  const q = query.trim().toUpperCase();
-  if (q.startsWith('SELECT COUNT(*) FROM SETS') || q.startsWith('SELECT * FROM SETS')) {
-    res.json({ success: true, count: serverDb.sets.length, rows: serverDb.sets });
-  } else if (q.startsWith('SELECT COUNT(*) FROM PLATES') || q.startsWith('SELECT * FROM PLATES')) {
-    res.json({ success: true, count: serverDb.plates.length, rows: serverDb.plates });
-  } else {
-    res.json({
-      success: true,
-      message: `Query processed successfully by SQL parser`,
-      affectedRows: 1,
-      rows: []
-    });
-  }
-});
-
-// 6. Sets Endpoints
+// 8. Individual Resource APIs
 app.get('/api/sets', (req: Request, res: Response) => {
   res.json({ success: true, data: serverDb.sets });
 });
@@ -274,6 +384,7 @@ app.post('/api/sets', (req: Request, res: Response) => {
       updatedAt: new Date().toISOString()
     });
   }
+  persistDatabase();
   res.json({ success: true, data: s });
 });
 
@@ -282,31 +393,18 @@ app.delete('/api/sets/:id', (req: Request, res: Response) => {
   serverDb.sets = serverDb.sets.filter(s => s.id !== id);
   serverDb.positions = serverDb.positions.filter(p => p.setId !== id);
   serverDb.plates = serverDb.plates.filter(pl => pl.currentSetId !== id);
+  persistDatabase();
   res.json({ success: true, message: 'Set deleted' });
 });
 
-// 7. Positions Endpoints
 app.get('/api/positions', (req: Request, res: Response) => {
   res.json({ success: true, data: serverDb.positions });
 });
 
-app.put('/api/positions/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const pIdx = serverDb.positions.findIndex(p => p.id === id);
-  if (pIdx >= 0) {
-    serverDb.positions[pIdx] = { ...serverDb.positions[pIdx], ...req.body, updatedAt: new Date().toISOString() };
-    res.json({ success: true, data: serverDb.positions[pIdx] });
-  } else {
-    res.status(404).json({ success: false, error: 'Position not found' });
-  }
-});
-
-// 8. Plates Endpoints
 app.get('/api/plates', (req: Request, res: Response) => {
   res.json({ success: true, data: serverDb.plates });
 });
 
-// 9. Daily Production Endpoints
 app.get('/api/production', (req: Request, res: Response) => {
   res.json({ success: true, data: serverDb.production });
 });
@@ -315,7 +413,6 @@ app.post('/api/production', (req: Request, res: Response) => {
   const dp = req.body;
   serverDb.production.push(dp);
   
-  // Update target set
   const s = serverDb.sets.find(x => x.id === dp.setId);
   if (s) {
     s.currentTotalCycle = dp.currentTotalCycle;
@@ -323,10 +420,10 @@ app.post('/api/production', (req: Request, res: Response) => {
     s.lastProductionDate = dp.date;
     s.updatedAt = new Date().toISOString();
   }
+  persistDatabase();
   res.json({ success: true, data: dp });
 });
 
-// 10. Audit Logs Endpoints
 app.get('/api/audit-logs', (req: Request, res: Response) => {
   res.json({ success: true, data: serverDb.auditLogs });
 });
@@ -337,48 +434,12 @@ app.post('/api/audit-logs', (req: Request, res: Response) => {
   if (serverDb.auditLogs.length > 500) {
     serverDb.auditLogs.pop();
   }
+  persistDatabase();
   res.json({ success: true, data: log });
 });
 
-// 11. Personnel Endpoints
 app.get('/api/personnel', (req: Request, res: Response) => {
   res.json({ success: true, data: serverDb.personnel });
-});
-
-// 12. Full Database Sync / Import / Export API
-app.get('/api/sync/all', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    data: {
-      sets: serverDb.sets,
-      positions: serverDb.positions,
-      plates: serverDb.plates,
-      installations: serverDb.installations,
-      removals: serverDb.removals,
-      production: serverDb.production,
-      replacements: serverDb.replacements,
-      jobOrders: serverDb.jobOrders,
-      auditLogs: serverDb.auditLogs,
-      personnel: serverDb.personnel
-    }
-  });
-});
-
-app.post('/api/sync/all', (req: Request, res: Response) => {
-  const { data } = req.body;
-  if (data) {
-    if (data.sets) serverDb.sets = data.sets;
-    if (data.positions) serverDb.positions = data.positions;
-    if (data.plates) serverDb.plates = data.plates;
-    if (data.installations) serverDb.installations = data.installations;
-    if (data.removals) serverDb.removals = data.removals;
-    if (data.production) serverDb.production = data.production;
-    if (data.replacements) serverDb.replacements = data.replacements;
-    if (data.jobOrders) serverDb.jobOrders = data.jobOrders;
-    if (data.auditLogs) serverDb.auditLogs = data.auditLogs;
-    if (data.personnel) serverDb.personnel = data.personnel;
-  }
-  res.json({ success: true, message: 'All tables synced to web server memory' });
 });
 
 // -------------------------------------------------------------
@@ -400,7 +461,20 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`PLMSys Local Web App Server listening at http://0.0.0.0:${PORT}`);
+    console.log('============================================================');
+    console.log(`  PLMSys Centralized Node.js Server Running!`);
+    console.log(`  Local Host: http://localhost:${PORT}`);
+
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name] || []) {
+        if (net.family === 'IPv4' && !net.internal) {
+          console.log(`  Factory Network (LAN): http://${net.address}:${PORT}`);
+        }
+      }
+    }
+    console.log('  Data Persistence: data/plmsys_database.json (Real-Time Sync)');
+    console.log('============================================================');
   });
 }
 

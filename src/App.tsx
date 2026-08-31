@@ -32,6 +32,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { TutorialModal } from './components/TutorialModal';
 import { useAutoBackup } from './hooks/useAutoBackup';
+import { centralSync } from './services/centralSyncService';
 import { Shield } from 'lucide-react';
 import { getTodayStr, getSetTodayProduction } from './utils';
 
@@ -195,8 +196,36 @@ export default function App() {
     }
   };
 
+  // Persist locally and synchronize across the LAN network to Node.js backend
+  const mutateAndSync = async () => {
+    await loadData();
+    centralSync.pushToServer().catch((err) => {
+      console.warn('[PLMSys] Push to central server deferred:', err);
+    });
+  };
+
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+    const initApp = async () => {
+      // 1. Check & sync with central Node server
+      await centralSync.initSync();
+      if (isMounted) {
+        await loadData();
+      }
+      // 2. Listen for real-time updates from other shop-floor tablets/browsers
+      centralSync.setOnRemoteDataChanged(async () => {
+        if (isMounted) {
+          await loadData();
+        }
+      });
+    };
+
+    initApp();
+
+    return () => {
+      isMounted = false;
+      centralSync.stopBackgroundSync();
+    };
   }, []);
 
   // Handlers
@@ -234,7 +263,7 @@ export default function App() {
 
     });
 
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleAddProduction = async (
@@ -276,7 +305,7 @@ export default function App() {
             deviceInfo: navigator.userAgent,
             checkedBy,
           });
-          await loadData();
+          await mutateAndSync();
           return;
         }
       }
@@ -329,7 +358,7 @@ export default function App() {
       checkedBy,
     });
 
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleAddProductionRange = async (
@@ -393,7 +422,7 @@ export default function App() {
       checkedBy,
     });
 
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleDeleteSet = async (setId: string) => {
@@ -457,7 +486,7 @@ export default function App() {
       if (selectedSetId === setId) {
         setSelectedSetId(null);
       }
-      await loadData();
+      await mutateAndSync();
     } catch (err) {
       console.error('Error deleting set:', err);
       alert(`Error deleting set: ${err instanceof Error ? err.message : String(err)}`);
@@ -515,7 +544,7 @@ export default function App() {
 
       });
 
-      await loadData();
+      await mutateAndSync();
     } catch (err) {
       console.error('Error deleting production log:', err);
       alert(`Error deleting production log: ${err instanceof Error ? err.message : String(err)}`);
@@ -631,7 +660,7 @@ export default function App() {
       deviceInfo: navigator.userAgent
     });
 
-    await loadData();
+    await mutateAndSync();
     setSelectedSetId(setId);
   };
 
@@ -716,7 +745,7 @@ export default function App() {
     });
 
     setSelectedPosModal(null);
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleRemovePlate = async (
@@ -789,7 +818,7 @@ export default function App() {
     });
 
     setSelectedPosModal(null);
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleReplacePlate = async (
@@ -919,7 +948,7 @@ export default function App() {
     });
 
     setSelectedPosModal(null);
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleExportBackup = async () => {
@@ -984,7 +1013,7 @@ export default function App() {
           if (json.personnel?.length) await db.personnel.bulkPut(json.personnel);
 
           alert('Database backup restored successfully!');
-          await loadData();
+          await mutateAndSync();
         } else {
           alert('Invalid backup file format.');
         }
@@ -1002,7 +1031,7 @@ export default function App() {
       setSelectedSetId(null);
       setSelectedPosModal(null);
       await seedDatabase(0, true);
-      await loadData();
+      await mutateAndSync();
     } catch (err) {
       console.error('Failed to restore factory settings:', err);
       alert('Failed to restore factory settings: ' + (err instanceof Error ? err.message : String(err)));
@@ -1014,12 +1043,12 @@ export default function App() {
   const handleAddPersonnel = async (personnelData: Omit<Personnel, 'id'>) => {
     const id = generateUUID();
     await db.personnel.put({ id, ...personnelData });
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleRemovePersonnel = async (id: string) => {
     await db.personnel.delete(id);
-    await loadData();
+    await mutateAndSync();
   };
 
   const handleLogin = (user: User) => {

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layers,
   Activity,
@@ -9,9 +9,13 @@ import {
   Shield,
   HelpCircle,
   LogOut,
-  Database
+  Database,
+  Wifi,
+  WifiOff,
+  RefreshCw
 } from 'lucide-react';
 import { User as UserType, SetRecord } from '../types';
+import { centralSync, SyncStatus } from '../services/centralSyncService';
 
 interface NavbarProps {
   activeTab: 'dashboard' | 'manage-set' | 'production' | 'search' | 'audit' | 'database' | 'admin';
@@ -40,6 +44,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenTutorial,
 }) => {
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(centralSync.getStatus());
+
+  useEffect(() => {
+    const unsub = centralSync.subscribeStatus(setSyncStatus);
+    return unsub;
+  }, []);
+
   // Global Keyboard Shortcuts (Alt+1 to Alt+6)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -188,8 +199,35 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </nav>
 
-        {/* Right: Top Most Right Log Out Button */}
+        {/* Right: Sync Status + Top Most Right Log Out Button */}
         <div className="d-flex align-items-center gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => centralSync.checkForRemoteUpdates()}
+            className={`d-none d-sm-flex align-items-center gap-1.5 px-2.5 py-1 rounded text-xs fw-semibold border transition-all cursor-pointer ${
+              syncStatus.connected
+                ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60 hover:bg-emerald-900/50'
+                : 'bg-amber-950/40 text-amber-400 border-amber-800/60 hover:bg-amber-900/50'
+            }`}
+            title={
+              syncStatus.connected
+                ? `Real-Time Sync Connected to Node.js Central Server (Rev ${syncStatus.serverRevision}). Click to check now.`
+                : 'Central Node.js Server not detected on port 3000. Running in local browser mode. Click to retry sync.'
+            }
+          >
+            {syncStatus.connected ? (
+              <>
+                <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span>Central Sync: Live</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3.5 h-3.5 text-amber-400" />
+                <span>Local Mode</span>
+              </>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={onLogout || onOpenLogin}
