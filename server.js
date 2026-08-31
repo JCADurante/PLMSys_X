@@ -7,7 +7,6 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import url from 'node:url';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -199,8 +198,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname || '/';
+  const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const pathname = reqUrl.pathname || '/';
 
   // API Routes
   if (pathname.startsWith('/api/')) {
