@@ -1,0 +1,71 @@
+================================================================================
+PLMSys - HOW TO RUN ON WINDOWS / LINUX / MACOS
+================================================================================
+
+If double-clicking the .bat file does nothing or closes immediately:
+
+--------------------------------------------------------------------------------
+REASON 1: RUNNING FROM INSIDE THE .ZIP FILE (MOST COMMON)
+--------------------------------------------------------------------------------
+In Windows, when you download a .zip file from GitHub or AI Studio and open it,
+Windows opens it in a "Compressed Folder" view. If you double-click a .bat file
+here, Windows cannot run the app because the files are still zipped.
+
+SOLUTION:
+1. Go to your Downloads folder.
+2. RIGHT-CLICK the downloaded ZIP file (e.g., plmsys-local-web-app.zip or repo.zip).
+3. Click "Extract All..."
+4. Choose a destination folder (e.g., C:\PLMSys or Desktop\PLMSys) and click "Extract".
+5. OPEN the extracted folder and double-click START-MINISERVE.bat or START.bat.
+
+
+--------------------------------------------------------------------------------
+REASON 2: WINDOWS SMARTSCREEN / SECURITY BLOCK
+--------------------------------------------------------------------------------
+Windows blocks batch files downloaded from the internet by default.
+
+SOLUTION:
+1. Right-click START-MINISERVE.bat (or START.bat).
+2. Click "Properties".
+3. At the bottom of the General tab, look for "Security: This file came from another computer..."
+4. Check the [X] "Unblock" box and click "Apply" -> "OK".
+5. Double-click the .bat file again.
+
+OR:
+When Windows SmartScreen shows "Windows protected your PC":
+Click "More info" -> Click "Run anyway".
+
+
+--------------------------------------------------------------------------------
+REASON 3: HOW TO RUN VIA COMMAND PROMPT (TO SEE EXACT ERRORS)
+--------------------------------------------------------------------------------
+If it still closes without showing output:
+1. Open the folder where the extracted files are.
+2. Click on the folder address bar at the top, type `cmd` and press Enter.
+3. A black Command Prompt window will open directly in that folder.
+4. Type:
+     START-MINISERVE.bat
+   and press Enter.
+5. If you want to run diagnostics, type:
+     DIAGNOSE.bat
+   and press Enter.
+
+
+--------------------------------------------------------------------------------
+WHICH SCRIPT SHOULD I RUN?
+--------------------------------------------------------------------------------
+1. START-MINISERVE.bat (RECOMMENDED):
+   - Fast, zero-install standalone server (Rust-based).
+   - Does NOT require Node.js or npm to be installed.
+   - Automatically opens http://localhost:3000 in your browser.
+   - Allows other tablets/PCs on your local network (LAN) to connect.
+
+2. START.bat:
+   - Development server using Node.js.
+   - Requires Node.js installed from https://nodejs.org/
+
+3. START-PRODUCTION.bat:
+   - Node.js production server with bundled server.cjs.
+   - Requires Node.js installed.
+
+================================================================================

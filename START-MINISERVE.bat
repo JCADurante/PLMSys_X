@@ -31,11 +31,21 @@ if not exist "dist\" (
     )
 )
 
-:: 2. Check if miniserve.exe exists in current dir, tools\, or in PATH
+:: 2. Check if miniserve.exe or downloaded release binary exists in current dir, tools\, or in PATH
 if exist "miniserve.exe" (
     SET "RUN_EXE=miniserve.exe"
+) else if exist "miniserve-v0.35.0-x86_64-pc-windows-msvc.exe" (
+    SET "RUN_EXE=miniserve-v0.35.0-x86_64-pc-windows-msvc.exe"
+) else if exist "miniserve*.exe" (
+    for %%f in (miniserve*.exe) do (
+        SET "RUN_EXE=%%f"
+    )
 ) else if exist "tools\miniserve.exe" (
     SET "RUN_EXE=tools\miniserve.exe"
+) else if exist "tools\miniserve*.exe" (
+    for %%f in (tools\miniserve*.exe) do (
+        SET "RUN_EXE=%%f"
+    )
 ) else (
     where miniserve >nul 2>nul
     if !errorlevel! equ 0 (
