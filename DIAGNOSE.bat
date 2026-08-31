@@ -42,13 +42,20 @@ ECHO.
 ECHO ------------------------------------------------------------
 ECHO 2. Checking Node.js & NPM:
 ECHO ------------------------------------------------------------
+if exist "%~dp0node.exe" (
+    ECHO [OK] Standalone portable node.exe detected in current directory!
+    set "PATH=%~dp0;%PATH%"
+) else if exist "%~dp0bin\node.exe" (
+    ECHO [OK] Standalone portable node.exe detected in bin\ directory!
+    set "PATH=%~dp0bin;%PATH%"
+)
 where node >nul 2>nul
 if %errorlevel% equ 0 (
-    for /f "tokens=*" %%i in ('node -v') do ECHO [OK] Node.js is installed: %%i
-    for /f "tokens=*" %%i in ('npm -v') do ECHO [OK] NPM is installed: %%i
+    for /f "tokens=*" %%i in ('node -v') do ECHO [OK] Node.js is ready: %%i
+    for /f "tokens=*" %%i in ('npm -v 2^>nul') do ECHO [OK] NPM is available: %%i
 ) else (
-    ECHO [FAIL] Node.js is not found in PATH!
-    ECHO [FIX] Download and install Node.js LTS from: https://nodejs.org/
+    ECHO [FAIL] Node.js is not found in PATH or local directory!
+    ECHO [FIX] Either drop a portable node.exe in this folder, or install Node.js from: https://nodejs.org/
 )
 
 ECHO.

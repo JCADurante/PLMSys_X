@@ -3,6 +3,16 @@ PLMSys - HOW TO RUN ON WINDOWS / LINUX / MACOS
 ================================================================================
 
 --------------------------------------------------------------------------------
+PORTABLE STANDALONE NODE.JS (ZERO INSTALLATION REQUIRED)
+--------------------------------------------------------------------------------
+If you do NOT want to install Node.js on your computer (or don't have admin rights):
+1. Download standalone `node.exe` (e.g. from https://nodejs.org/dist/latest/win-x64/node.exe or the official Node.js .zip package).
+2. Place `node.exe` directly inside the PLMSys folder.
+3. Double-click `START.bat`.
+   - `START.bat` will automatically detect the local `node.exe` and start `server.js` without any installation or system configuration needed!
+   - `server.js` has zero external npm dependencies and runs 100% offline.
+
+--------------------------------------------------------------------------------
 QUICK START (WINDOWS)
 --------------------------------------------------------------------------------
 1. Extract the downloaded ZIP file to a folder (e.g. C:\PLMSys).

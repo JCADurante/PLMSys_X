@@ -23,18 +23,32 @@ if not exist "package.json" (
     EXIT /B 1
 )
 
-:: 2. Check if Node.js is installed
-node -v >nul 2>nul
-if %errorlevel% neq 0 (
-    if exist "C:\Program Files\nodejs\node.exe" set "PATH=C:\Program Files\nodejs;%PATH%"
-    if exist "%LOCALAPPDATA%\Programs\node\node.exe" set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
-    if exist "%ProgramFiles%\nodejs\node.exe" set "PATH=%ProgramFiles%\nodejs;%PATH%"
+:: 2. Check for Portable / Standalone Node.js or System Node.js
+if exist "%~dp0node.exe" (
+    set "PATH=%~dp0;%PATH%"
+    ECHO [OK] Using portable standalone Node.js from current folder.
+) else if exist "%~dp0bin\node.exe" (
+    set "PATH=%~dp0bin;%PATH%"
+    ECHO [OK] Using portable Node.js from bin folder.
+) else if exist "%~dp0nodejs\node.exe" (
+    set "PATH=%~dp0nodejs;%PATH%"
+    ECHO [OK] Using portable Node.js from nodejs folder.
+) else if exist "%~dp0node\node.exe" (
+    set "PATH=%~dp0node;%PATH%"
+    ECHO [OK] Using portable Node.js from node folder.
+) else (
+    node -v >nul 2>nul
+    if %errorlevel% neq 0 (
+        if exist "C:\Program Files\nodejs\node.exe" set "PATH=C:\Program Files\nodejs;%PATH%"
+        if exist "%LOCALAPPDATA%\Programs\node\node.exe" set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
+        if exist "%ProgramFiles%\nodejs\node.exe" set "PATH=%ProgramFiles%\nodejs;%PATH%"
+    )
 )
 
 node -v >nul 2>nul
 if %errorlevel% neq 0 (
-    ECHO [ERROR] Node.js is NOT installed or not found in system PATH.
-    ECHO Please install Node.js (v18 or higher) from https://nodejs.org/
+    ECHO [ERROR] Node.js is NOT found on this computer.
+    ECHO You can drop node.exe into this folder or install Node.js from https://nodejs.org/
     ECHO.
     PAUSE
     EXIT /B 1

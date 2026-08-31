@@ -98,10 +98,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
               <h2 className="card-title fw-bolder text-light mb-0">Plate Lifecycle & Set Operations</h2>
-              <span className="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 d-inline-flex align-items-center gap-1.5 px-2 py-1 text-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Real-Time Live
-              </span>
             </div>
             <p className="text-secondary small mb-0 font-mono">
               System Time: <span className="text-light fw-bold">{currentTimeStr}</span> · Shift Date: <span className="text-light fw-bold">{todayStr}</span>
@@ -137,9 +133,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="text-muted small fw-bold text-uppercase tracking-wider mb-3 d-flex align-items-center justify-content-between">
           <span className="d-flex align-items-center gap-2">
             <BarChart2 className="w-4 h-4 text-primary" /> Operational Plate Metrics
-          </span>
-          <span className="text-emerald-400 text-xs font-mono d-inline-flex align-items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> Live Sync Active
           </span>
         </div>
         <div className="row g-3">
