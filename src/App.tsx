@@ -33,6 +33,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { TutorialModal } from './components/TutorialModal';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import { centralSync } from './services/centralSyncService';
+import { exportAllDataToExcel } from './services/excelExportService';
 import { Shield } from 'lucide-react';
 import { getTodayStr, getSetTodayProduction } from './utils';
 
@@ -198,10 +199,12 @@ export default function App() {
 
   // Persist locally and synchronize across the LAN network to Node.js backend
   const mutateAndSync = async () => {
-    await loadData();
-    centralSync.pushToServer().catch((err) => {
+    try {
+      await centralSync.pushToServer();
+    } catch (err) {
       console.warn('[PLMSys] Push to central server deferred:', err);
-    });
+    }
+    await loadData();
   };
 
   useEffect(() => {
@@ -425,50 +428,55 @@ export default function App() {
     await mutateAndSync();
   };
 
-  const handleDeleteSet = async (setId: string) => {
+  const handleDeleteSet = async (setId: string, reason?: string) => {
+    if (currentUser.role !== 'ADMIN') {
+      alert('Access Denied: Only Administrator accounts can delete machine sets.');
+      return;
+    }
     try {
       const targetSet = sets.find(s => s.id === setId);
-      if (!targetSet) return;
-      if (!confirm(`Are you sure you want to delete ${targetSet.displayName} and all its positions/plates?`)) return;
+      const displayName = targetSet ? targetSet.displayName : `Set ${setId}`;
 
+      // 1. Delete the set from db.sets
       await db.sets.delete(setId);
       
-      // In-memory filter positions to delete for 100% reliability
+      // 2. Cascade delete all positions associated with this set
       const allPositions = await db.positions.toArray();
       for (const p of allPositions.filter(pos => pos.setId === setId)) {
         await db.positions.delete(p.id);
       }
 
-      // In-memory filter plates to delete
+      // 3. Cascade delete all plates assigned to this set
       const allPlates = await db.plates.toArray();
       for (const pl of allPlates.filter(p => p.currentSetId === setId)) {
         await db.plates.delete(pl.id);
       }
 
-      // In-memory filter installations to delete
+      // 4. Cascade delete all plate installations for this set
       const allInstallations = await db.plateInstallations.toArray();
       for (const inst of allInstallations.filter(i => i.setId === setId)) {
         await db.plateInstallations.delete(inst.id);
       }
 
-      // In-memory filter removals to delete
+      // 5. Cascade delete all plate removals for this set
       const allRemovals = await db.plateRemovals.toArray();
       for (const rem of allRemovals.filter(r => r.setId === setId)) {
         await db.plateRemovals.delete(rem.id);
       }
 
-      // In-memory filter production to delete
+      // 6. Cascade delete all daily production logs for this set
       const allDailyProds = await db.dailyProduction.toArray();
       for (const dp of allDailyProds.filter(d => d.setId === setId)) {
         await db.dailyProduction.delete(dp.id);
       }
 
-      // In-memory filter replacements to delete
+      // 7. Cascade delete all replacements for this set
       const allReplacements = await db.replacements.toArray();
       for (const rep of allReplacements.filter(r => r.setId === setId)) {
         await db.replacements.delete(rep.id);
       }
 
+      // 8. Add audit log record
       const auditCode = `AUD-${String(auditLogs.length + 1).padStart(6, '0')}`;
       await db.auditLogs.put({
         id: generateUUID(),
@@ -477,23 +485,28 @@ export default function App() {
         action: 'DELETE_SET',
         timestamp: new Date().toISOString(),
         recordId: setId,
-        oldValue: targetSet.displayName,
-        reason: `Permanently deleted master set ${targetSet.displayName} and all its positions, plates, and installations.`,
+        oldValue: displayName,
+        reason: reason || `Permanently deleted master set ${displayName} and all its positions, plates, and installations.`,
         deviceInfo: navigator.userAgent,
-
       });
 
       if (selectedSetId === setId) {
         setSelectedSetId(null);
       }
+      
       await mutateAndSync();
     } catch (err) {
       console.error('Error deleting set:', err);
       alert(`Error deleting set: ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
     }
   };
 
-  const handleDeleteProduction = async (prodId: string) => {
+  const handleDeleteProduction = async (prodId: string, reason?: string) => {
+    if (currentUser.role !== 'ADMIN') {
+      alert('Access Denied: Only Administrator accounts can delete production logs.');
+      return;
+    }
     try {
       const prod = dailyProductions.find(p => p.id === prodId);
       if (!prod) return;
@@ -501,21 +514,17 @@ export default function App() {
       const targetSet = sets.find(s => s.id === prod.setId);
       const setDisplayName = targetSet ? targetSet.displayName : 'Unknown Set';
 
-      if (!confirm(`Are you sure you want to permanently delete this production log of +${prod.productionCycles.toLocaleString()} cycles for ${setDisplayName}? This action will permanently reverse the cycle count.`)) {
-        return;
-      }
-
       // 1. Permanently delete from dailyProduction
       await db.dailyProduction.delete(prodId);
 
       // 2. Adjust Set current cycle counts if the Set still exists
       if (targetSet) {
         const prevCycle = targetSet.currentTotalCycle;
-        const newCycle = Math.max(0, prevCycle - prod.productionCycles);
+        const newCycle = Math.max(targetSet.initialCycle || 0, prevCycle - prod.productionCycles);
 
         // Decrement today's production if the record is on the same day as today
         const todayStr = getTodayStr();
-        let newTodayProd = targetSet.todayProduction;
+        let newTodayProd = targetSet.todayProduction || 0;
         if (prod.date === todayStr && targetSet.lastProductionDate === todayStr) {
           newTodayProd = Math.max(0, targetSet.todayProduction - prod.productionCycles);
         } else if (targetSet.lastProductionDate !== todayStr) {
@@ -538,16 +547,189 @@ export default function App() {
         action: 'DELETE_PRODUCTION',
         timestamp: new Date().toISOString(),
         recordId: prodId,
-        oldValue: `Set: ${setDisplayName}, Cycles: +${prod.productionCycles}`,
-        reason: `Permanently deleted production log of +${prod.productionCycles} cycles for ${setDisplayName} (Job Order: ${prod.jobOrderId || 'N/A'}).`,
+        oldValue: `Set: ${setDisplayName}, Cycles: +${prod.productionCycles}, Date: ${prod.date}, JO: ${prod.jobOrderId}`,
+        reason: reason || `Admin deleted production log of +${prod.productionCycles.toLocaleString()} cycles for ${setDisplayName} (Job Order: ${prod.jobOrderId || 'N/A'}).`,
         deviceInfo: navigator.userAgent,
-
       });
 
       await mutateAndSync();
     } catch (err) {
       console.error('Error deleting production log:', err);
       alert(`Error deleting production log: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleEditProduction = async (
+    prodId: string,
+    updatedFields: Partial<DailyProductionRecord>,
+    reason: string
+  ) => {
+    if (currentUser.role !== 'ADMIN') {
+      alert('Access Denied: Only Administrator accounts can edit production logs.');
+      return;
+    }
+    try {
+      const prod = dailyProductions.find(p => p.id === prodId);
+      if (!prod) {
+        throw new Error('Production log not found.');
+      }
+
+      const oldSet = sets.find(s => s.id === prod.setId);
+      const newSetId = updatedFields.setId || prod.setId;
+      const newSet = sets.find(s => s.id === newSetId);
+
+      const oldCycles = prod.productionCycles;
+      const newCycles = updatedFields.productionCycles !== undefined ? Number(updatedFields.productionCycles) : oldCycles;
+      const oldDate = prod.date;
+      const newDate = updatedFields.date || oldDate;
+      const todayStr = getTodayStr();
+
+      // Recalculate set cycles
+      if (oldSet && newSet && oldSet.id === newSet.id) {
+        const cycleDelta = newCycles - oldCycles;
+        const newTotalCycle = Math.max(oldSet.initialCycle || 0, oldSet.currentTotalCycle + cycleDelta);
+
+        let newTodayProd = oldSet.todayProduction || 0;
+        if (newDate === todayStr && oldDate === todayStr) {
+          newTodayProd = Math.max(0, newTodayProd + cycleDelta);
+        } else if (newDate === todayStr && oldDate !== todayStr) {
+          newTodayProd = Math.max(0, newTodayProd + newCycles);
+        } else if (newDate !== todayStr && oldDate === todayStr) {
+          newTodayProd = Math.max(0, newTodayProd - oldCycles);
+        }
+
+        await db.sets.update(oldSet.id, {
+          currentTotalCycle: newTotalCycle,
+          todayProduction: newTodayProd,
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (oldSet && newSet && oldSet.id !== newSet.id) {
+        // Old set has cycles deducted
+        const oldSetNewTotal = Math.max(oldSet.initialCycle || 0, oldSet.currentTotalCycle - oldCycles);
+        let oldSetTodayProd = oldSet.todayProduction || 0;
+        if (oldDate === todayStr) {
+          oldSetTodayProd = Math.max(0, oldSetTodayProd - oldCycles);
+        }
+        await db.sets.update(oldSet.id, {
+          currentTotalCycle: oldSetNewTotal,
+          todayProduction: oldSetTodayProd,
+          updatedAt: new Date().toISOString(),
+        });
+
+        // New set has cycles added
+        const newSetNewTotal = (newSet.currentTotalCycle || 0) + newCycles;
+        let newSetTodayProd = newSet.todayProduction || 0;
+        if (newDate === todayStr) {
+          newSetTodayProd = newSetTodayProd + newCycles;
+        }
+        await db.sets.update(newSet.id, {
+          currentTotalCycle: newSetNewTotal,
+          todayProduction: newSetTodayProd,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // Update the dailyProduction record
+      const updatedRecord: DailyProductionRecord = {
+        ...prod,
+        ...updatedFields,
+        productionCycles: newCycles,
+        currentTotalCycle: newSet ? (newSet.currentTotalCycle + (newCycles - oldCycles)) : prod.currentTotalCycle
+      };
+      await db.dailyProduction.update(prodId, updatedRecord);
+
+      // Audit Log
+      const auditCode = `AUD-${String(auditLogs.length + 1).padStart(6, '0')}`;
+      const changesSummary = [
+        oldCycles !== newCycles ? `Cycles: ${oldCycles.toLocaleString()} -> ${newCycles.toLocaleString()}` : null,
+        prod.jobOrderId !== updatedFields.jobOrderId && updatedFields.jobOrderId ? `JO: ${prod.jobOrderId} -> ${updatedFields.jobOrderId}` : null,
+        prod.date !== updatedFields.date && updatedFields.date ? `Date: ${prod.date} -> ${updatedFields.date}` : null,
+        prod.operatorId !== updatedFields.operatorId && updatedFields.operatorId ? `Operator: ${prod.operatorId} -> ${updatedFields.operatorId}` : null,
+        prod.checkedBy !== updatedFields.checkedBy && updatedFields.checkedBy ? `CheckedBy: ${prod.checkedBy} -> ${updatedFields.checkedBy}` : null,
+      ].filter(Boolean).join(', ');
+
+      await db.auditLogs.put({
+        id: generateUUID(),
+        auditCode,
+        user: currentUser.name,
+        action: 'EDIT_PRODUCTION',
+        timestamp: new Date().toISOString(),
+        recordId: prodId,
+        oldValue: `Set: ${oldSet?.displayName || prod.setId}, Cycles: +${oldCycles}, JO: ${prod.jobOrderId}, Date: ${prod.date}, Op: ${prod.operatorId}`,
+        newValue: `Set: ${newSet?.displayName || updatedFields.setId || prod.setId}, Cycles: +${newCycles}, JO: ${updatedFields.jobOrderId || prod.jobOrderId}, Date: ${updatedFields.date || prod.date}, Op: ${updatedFields.operatorId || prod.operatorId}`,
+        reason: reason || `Admin modified production log (${changesSummary || 'Details updated'}).`,
+        deviceInfo: navigator.userAgent,
+      });
+
+      await mutateAndSync();
+    } catch (err) {
+      console.error('Error editing production log:', err);
+      alert(`Error editing production log: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleDeletePlateLog = async (
+    logId: string,
+    logType: 'installation' | 'removal' | 'replacement',
+    reason?: string
+  ) => {
+    if (currentUser.role !== 'ADMIN') {
+      alert('Access Denied: Only Administrator accounts can delete plate logs.');
+      return;
+    }
+    try {
+      let logDesc = '';
+      if (logType === 'installation') {
+        const inst = installations.find(i => i.id === logId);
+        logDesc = `Installation log for plate ${inst?.plateId || logId}`;
+        await db.plateInstallations.delete(logId);
+      } else if (logType === 'removal') {
+        const rem = removals.find(r => r.id === logId);
+        logDesc = `Removal/Reject log for plate ${rem?.plateId || logId}`;
+        await db.plateRemovals.delete(logId);
+      } else if (logType === 'replacement') {
+        const rep = replacements.find(r => r.id === logId);
+        logDesc = `Replacement log (${rep?.oldPlateId} -> ${rep?.newPlateId})`;
+        await db.replacements.delete(logId);
+      }
+
+      const auditCode = `AUD-${String(auditLogs.length + 1).padStart(6, '0')}`;
+      await db.auditLogs.put({
+        id: generateUUID(),
+        auditCode,
+        user: currentUser.name,
+        action: 'DELETE_PLATE_LOG',
+        timestamp: new Date().toISOString(),
+        recordId: logId,
+        oldValue: logDesc,
+        reason: reason || `Admin manually deleted ${logType} log (${logDesc}).`,
+        deviceInfo: navigator.userAgent,
+      });
+
+      await mutateAndSync();
+    } catch (err) {
+      console.error('Error deleting plate log:', err);
+      alert(`Error deleting plate log: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      await exportAllDataToExcel();
+      const auditCode = `AUD-${String(auditLogs.length + 1).padStart(6, '0')}`;
+      await db.auditLogs.put({
+        id: generateUUID(),
+        auditCode,
+        user: currentUser.name,
+        action: 'BACKUP',
+        timestamp: new Date().toISOString(),
+        reason: 'Exported complete database to Excel workbook (.xlsx)',
+        deviceInfo: navigator.userAgent,
+      });
+      await mutateAndSync();
+    } catch (err) {
+      console.error('Error exporting to Excel:', err);
+      alert(`Error exporting to Excel: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -1125,12 +1307,17 @@ export default function App() {
             jobOrders={jobOrders}
             dailyProductions={dailyProductions}
             personnel={personnel}
+            currentUser={currentUser}
             onBack={() => setSelectedSetId(null)}
             onSelectSet={(id) => setSelectedSetId(id)}
             onAddProduction={handleAddProduction}
             onOpenPositionModal={(pos, action) => {
               setSelectedPosModal({ position: pos, action });
             }}
+            onDeleteSet={handleDeleteSet}
+            onDeleteProduction={handleDeleteProduction}
+            onEditProduction={handleEditProduction}
+            onDeletePlateLog={handleDeletePlateLog}
           />
         ) : (
           <>
@@ -1157,9 +1344,11 @@ export default function App() {
                 positions={positions}
                 plates={plates}
                 dailyProductions={dailyProductions}
+                currentUser={currentUser}
                 onSelectSet={(setId) => setSelectedSetId(setId)}
                 onOpenCreateSet={handleOpenCreateSet}
                 onUpdateSet={handleUpdateSet}
+                onDeleteSet={handleDeleteSet}
               />
             )}
             {activeTab === 'production' && (
@@ -1167,7 +1356,11 @@ export default function App() {
                 dailyProductions={dailyProductions}
                 sets={sets}
                 jobOrders={jobOrders}
+                personnel={personnel}
+                currentUser={currentUser}
                 onOpenLogProduction={() => setShowLogProductionModal(true)}
+                onDeleteProduction={handleDeleteProduction}
+                onEditProduction={handleEditProduction}
               />
             )}
             {activeTab === 'search' && (
@@ -1191,7 +1384,22 @@ export default function App() {
             )}
             {(activeTab === 'admin' || activeTab === 'database') && currentUser.role === 'ADMIN' && (
               <AdminDashboard 
+                sets={sets}
+                positions={positions}
+                plates={plates}
+                installations={installations}
+                removals={removals}
+                dailyProductions={dailyProductions}
+                replacements={replacements}
+                auditLogs={auditLogs}
+                personnel={personnel}
+                currentUser={currentUser}
+                onDeleteSet={handleDeleteSet}
+                onDeleteProduction={handleDeleteProduction}
+                onEditProduction={handleEditProduction}
+                onDeletePlateLog={handleDeletePlateLog}
                 onExportBackup={handleExportBackup} 
+                onExportExcel={handleExportExcel}
                 onImportBackup={handleImportBackup} 
                 onRestoreFactory={handleRestoreFactory}
                 onDataChanged={loadData}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { SetRecord, PositionRecord, PlateRecord, DailyProductionRecord } from '../types';
-import { Sliders, Plus, Edit2, Check, X, AlertCircle, ArrowRight, Search, Activity } from 'lucide-react';
+import { SetRecord, PositionRecord, PlateRecord, DailyProductionRecord, User } from '../types';
+import { Sliders, Plus, Edit2, Check, X, AlertCircle, ArrowRight, Search, Activity, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { getSetTodayProduction, getTodayStr } from '../utils';
 
 interface ManageSetViewProps {
@@ -8,15 +8,17 @@ interface ManageSetViewProps {
   positions: PositionRecord[];
   plates: PlateRecord[];
   dailyProductions?: DailyProductionRecord[];
+  currentUser?: User;
   onSelectSet: (setId: string) => void;
   onOpenCreateSet: () => void;
-  onUpdateSet: (
+  onUpdateSet?: (
     setId: string,
     displayName: string,
     shortCode: string,
     status: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE',
     currentTotalCycle: number
   ) => Promise<void>;
+  onDeleteSet?: (setId: string, reason?: string) => Promise<void>;
 }
 
 export const ManageSetView: React.FC<ManageSetViewProps> = ({
@@ -24,13 +26,32 @@ export const ManageSetView: React.FC<ManageSetViewProps> = ({
   positions,
   plates,
   dailyProductions = [],
+  currentUser,
   onSelectSet,
   onOpenCreateSet,
+  onDeleteSet,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [fromSetFilter, setFromSetFilter] = useState('');
   const [toSetFilter, setToSetFilter] = useState('');
+  const [setToDelete, setSetToDelete] = useState<SetRecord | null>(null);
+  const [deleteSetReason, setDeleteSetReason] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   const todayStr = getTodayStr();
+
+  const handleConfirmDelete = async () => {
+    if (!setToDelete || !onDeleteSet) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteSet(setToDelete.id, deleteSetReason.trim() || undefined);
+      setSetToDelete(null);
+      setDeleteSetReason('');
+    } catch (err: any) {
+      alert(`Failed to delete set: ${err?.message || String(err)}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
 
   // Filter Sets
@@ -148,17 +169,32 @@ export const ManageSetView: React.FC<ManageSetViewProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      set.status === 'ACTIVE'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : set.status === 'MAINTENANCE'
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
-                    }`}
-                  >
-                    {set.status}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        set.status === 'ACTIVE'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : set.status === 'MAINTENANCE'
+                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                      }`}
+                    >
+                      {set.status}
+                    </span>
+                    {currentUser?.role === 'ADMIN' && onDeleteSet && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSetToDelete(set);
+                        }}
+                        title="Delete Set (Admin Only)"
+                        className="p-1 text-[#8E9299] hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {(() => {
@@ -245,6 +281,77 @@ export const ManageSetView: React.FC<ManageSetViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Delete Set Confirmation Modal */}
+      {setToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#0F1117] border border-[#1E222A] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#1E222A] pb-3">
+              <div className="flex items-center gap-2 text-rose-500">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="text-base font-bold text-white">Delete Master Set</h3>
+              </div>
+              {!isDeleting && (
+                <button
+                  type="button"
+                  onClick={() => setSetToDelete(null)}
+                  className="text-[#8E9299] hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm text-gray-300 leading-relaxed">
+                Are you sure you want to permanently delete <strong className="text-white">{setToDelete.displayName} ({setToDelete.shortCode})</strong>?
+              </p>
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs text-rose-400 leading-relaxed">
+                ⚠️ This will cascade and delete all associated positions (P01-P11), allocated plate tracking history, and daily production records for this set.
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[10px] font-bold text-[#8E9299] uppercase tracking-wider block">
+                  Deletion Reason (Optional):
+                </label>
+                <input
+                  type="text"
+                  value={deleteSetReason}
+                  onChange={(e) => setDeleteSetReason(e.target.value)}
+                  placeholder="e.g. Machine decommissioned / Duplicate set created by error"
+                  className="w-full px-3 py-2 bg-[#0A0B0E] border border-[#1E222A] text-white rounded-lg text-xs focus:outline-none focus:border-rose-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#1E222A]">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setSetToDelete(null)}
+                className="px-4 py-2 bg-[#191D28] hover:bg-[#252A38] border border-[#1E222A] text-gray-300 rounded-lg text-xs font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold shadow-md cursor-pointer disabled:opacity-50 transition-all"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Yes, Delete Set</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

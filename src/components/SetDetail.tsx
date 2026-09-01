@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { SetRecord, PositionRecord, PlateRecord, JobOrderRecord, PlateInstallationRecord, DailyProductionRecord, Personnel } from '../types';
-import { ArrowLeft, Activity, Plus, Wrench, Trash2, RefreshCw, CheckCircle, AlertTriangle, ShieldCheck, Calendar, User, ChevronLeft, ChevronRight, Layers, Lock, X, AlertCircle, Clock } from 'lucide-react';
+import { SetRecord, PositionRecord, PlateRecord, JobOrderRecord, PlateInstallationRecord, DailyProductionRecord, Personnel, User } from '../types';
+import { ArrowLeft, Activity, Plus, Wrench, Trash2, RefreshCw, CheckCircle, AlertTriangle, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Layers, Lock, X, AlertCircle, Clock, RotateCcw } from 'lucide-react';
 import { formatJobOrder, isValidJobOrder, getSetTodayProduction, getTodayStr, getNowTimeStr } from '../utils';
 
 interface SetDetailProps {
@@ -12,11 +12,15 @@ interface SetDetailProps {
   jobOrders: JobOrderRecord[];
   dailyProductions?: DailyProductionRecord[];
   personnel: Personnel[];
+  currentUser?: User;
   onBack: () => void;
   onSelectSet?: (setId: string) => void;
   onAddProduction: (setId: string, positionId: string | 'ALL', cycles: number, jobOrderId: string, operatorName: string, checkedBy: string, remarks: string) => void;
   onOpenPositionModal: (position: PositionRecord, action: 'install' | 'replace' | 'history') => void;
-  onDeleteSet?: (setId: string) => void;
+  onDeleteSet?: (setId: string, reason?: string) => Promise<void> | void;
+  onDeleteProduction?: (prodId: string, reason?: string) => Promise<void>;
+  onEditProduction?: (prodId: string, updatedFields: Partial<DailyProductionRecord>, reason: string) => Promise<void>;
+  onDeletePlateLog?: (logId: string, logType: 'installation' | 'removal' | 'replacement', reason?: string) => Promise<void>;
 }
 
 export const SetDetail: React.FC<SetDetailProps> = ({
@@ -28,11 +32,15 @@ export const SetDetail: React.FC<SetDetailProps> = ({
   jobOrders,
   dailyProductions = [],
   personnel,
+  currentUser,
   onBack,
   onSelectSet,
   onAddProduction,
   onOpenPositionModal,
   onDeleteSet,
+  onDeleteProduction,
+  onEditProduction,
+  onDeletePlateLog,
 }) => {
   const [liveTime, setLiveTime] = useState(() => new Date());
 
@@ -137,6 +145,11 @@ export const SetDetail: React.FC<SetDetailProps> = ({
       <option key={opt.value} value={opt.value}>{opt.label}</option>
     ));
   };
+
+  // Delete Set Modal state
+  const [showDeleteSetModal, setShowDeleteSetModal] = useState(false);
+  const [deleteSetReason, setDeleteSetReason] = useState('');
+  const [isDeletingSet, setIsDeletingSet] = useState(false);
 
   const handleOpenAuthModal = () => {
     setAuthError('');
@@ -268,6 +281,18 @@ export const SetDetail: React.FC<SetDetailProps> = ({
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            {currentUser?.role === 'ADMIN' && onDeleteSet && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteSetReason('');
+                  setShowDeleteSetModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-sm font-semibold transition-all cursor-pointer whitespace-nowrap"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Set
+              </button>
+            )}
             <button
               onClick={() => setShowProductionForm(!showProductionForm)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F27D26] hover:bg-[#d96a1f] text-white text-sm font-semibold shadow-lg shadow-[#F27D26]/20 transition-all cursor-pointer whitespace-nowrap"
@@ -673,6 +698,89 @@ export const SetDetail: React.FC<SetDetailProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE SET CONFIRMATION MODAL (ADMIN ONLY) */}
+      {showDeleteSetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#0F1117] border border-[#1E222A] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#1E222A] pb-3">
+              <div className="flex items-center gap-2 text-rose-500">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="text-base font-bold text-white">Delete Master Set</h3>
+              </div>
+              {!isDeletingSet && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteSetModal(false)}
+                  className="text-[#8E9299] hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm text-gray-300 leading-relaxed">
+                Are you sure you want to permanently delete <strong className="text-white">{setRecord.displayName} ({setRecord.shortCode})</strong>?
+              </p>
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs text-rose-400 leading-relaxed">
+                ⚠️ This will cascade and delete all associated positions (P01-P11), allocated plate tracking history, and daily production records for this set.
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-[#8E9299] uppercase tracking-wider block mb-1">
+                  Reason for Deletion (Optional):
+                </label>
+                <input
+                  type="text"
+                  value={deleteSetReason}
+                  onChange={(e) => setDeleteSetReason(e.target.value)}
+                  placeholder="e.g. Set decommissioned / wrong set entered"
+                  className="w-full px-3 py-2 bg-[#0A0B0E] border border-[#1E222A] text-white rounded-lg text-xs focus:outline-none focus:border-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#1E222A]">
+              <button
+                type="button"
+                disabled={isDeletingSet}
+                onClick={() => setShowDeleteSetModal(false)}
+                className="px-4 py-2 bg-[#191D28] hover:bg-[#252A38] border border-[#1E222A] text-gray-300 rounded-lg text-xs font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingSet}
+                onClick={async () => {
+                  if (!onDeleteSet) return;
+                  setIsDeletingSet(true);
+                  try {
+                    await onDeleteSet(setRecord.id, deleteSetReason.trim() || undefined);
+                    setShowDeleteSetModal(false);
+                    onBack();
+                  } catch (err: any) {
+                    alert(`Failed to delete set: ${err?.message || String(err)}`);
+                  } finally {
+                    setIsDeletingSet(false);
+                  }
+                }}
+                className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold shadow-md cursor-pointer disabled:opacity-50 transition-all"
+              >
+                {isDeletingSet ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Yes, Delete Set</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
