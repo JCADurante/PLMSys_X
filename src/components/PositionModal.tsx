@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PositionRecord, SetRecord, PlateRecord, PlateInstallationRecord, PlateRemovalRecord, Personnel } from '../types';
-import { X, AlertTriangle, Calendar, User, Wrench, Barcode, ArrowRight, Clock, History, CheckCircle, Info } from 'lucide-react';
+import { X, AlertTriangle, Calendar, User, Wrench, Barcode, ArrowRight, Clock, History, CheckCircle, Info, RefreshCw } from 'lucide-react';
 
 interface PositionModalProps {
   position: PositionRecord;
@@ -229,11 +229,19 @@ export const PositionModal: React.FC<PositionModalProps> = ({
               {position.fullCode}
             </span>
             <div>
-              <h3 className="font-bold text-lg">{setRecord.displayName} - Position {position.positionCode}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-lg">{setRecord.displayName}</h3>
+                {(setRecord.finish || setRecord.numberOfOuts) && (
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                    {setRecord.finish || 'Glossy'} · {setRecord.numberOfOuts || 32} Outs
+                  </span>
+                )}
+                <span className="text-sm font-mono text-[#8E9299]">Pos {position.positionCode}</span>
+              </div>
               <p className="text-xs text-[#8E9299]">
                 {modalAction === 'install' && 'Install New Plate'}
                 {modalAction === 'replace' && 'Replace Plate (Seamless Swap)'}
-                {modalAction === 'history' && 'Plate Lifecycle Ledger & History'}
+                {modalAction === 'history' && 'Plate Lifecycle Ledger & Construction History'}
               </p>
             </div>
           </div>
@@ -604,24 +612,42 @@ export const PositionModal: React.FC<PositionModalProps> = ({
                 </div>
               )}
 
-              {showConfirmReplace && (
-                <div className="bg-[#191D28] border border-[#F27D26] p-4 rounded-xl text-center space-y-3 animate-fadeIn">
-                  <p className="text-white text-sm font-semibold">Confirm plate replacement and save history record?</p>
-                  <div className="flex justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmReplace(false)}
-                      className="px-4 py-1.5 rounded-lg bg-[#2D333E] hover:bg-[#3b4351] text-[#E0E2E5] text-xs font-semibold"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={executeReplace}
-                      className="px-4 py-1.5 rounded-lg bg-[#F27D26] hover:bg-[#d96a1f] text-white text-xs font-semibold"
-                    >
-                      Confirm Replacement
-                    </button>
+              {/* Centered Confirmation Pop-up Modal */}
+              {showConfirmReplace && currentPlate && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+                  <div className="bg-[#0F1117] border border-[#252A38] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 text-center animate-scaleIn">
+                    <div className="w-12 h-12 rounded-full bg-[#F27D26]/15 border border-[#F27D26]/30 text-[#F27D26] flex items-center justify-center mx-auto shadow-inner">
+                      <RefreshCw className="w-6 h-6" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="text-base font-bold text-white">
+                        Confirm plate replacement and save history record?
+                      </h4>
+                      <p className="text-xs text-[#8E9299] leading-relaxed">
+                        Plate <strong className="font-mono text-white">{currentPlate.plateSerialNumber}</strong> will be archived as <strong className={evaluationStatus === 'REJECTED' ? 'text-rose-400' : 'text-amber-400'}>{evaluationStatus}</strong> and replaced with a new plate at position <strong className="text-white font-mono">{position.fullCode}</strong>.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmReplace(false)}
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#191D28] hover:bg-[#252A38] text-[#8E9299] hover:text-white text-sm font-semibold border border-[#1E222A] transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowConfirmReplace(false);
+                          executeReplace();
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#F27D26] hover:bg-[#d96a1f] text-white text-sm font-bold shadow-lg shadow-[#F27D26]/20 transition-all cursor-pointer"
+                      >
+                        Confirm Replacement
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -700,11 +726,16 @@ export const PositionModal: React.FC<PositionModalProps> = ({
                         }`}
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1E222A] pb-3 mb-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <Barcode className="w-4 h-4 text-[#F27D26]" />
                             <span className="font-mono text-sm font-bold text-white">
                               {pl ? pl.plateSerialNumber : 'Unknown Serial'}
                             </span>
+                            {(inst.construction || inst.finish || pl?.construction || pl?.finish || setRecord.construction || setRecord.finish) && (
+                              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-[#12141D] text-slate-300 border border-[#1E222A]">
+                                {inst.finish || pl?.finish || setRecord.finish || 'Standard'} · {inst.numberOfOuts || pl?.numberOfOuts || setRecord.numberOfOuts || 32} Outs
+                              </span>
+                            )}
                             {isCurrent ? (
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                 CURRENTLY ACTIVE

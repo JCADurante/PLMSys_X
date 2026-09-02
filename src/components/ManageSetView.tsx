@@ -163,7 +163,14 @@ export const ManageSetView: React.FC<ManageSetViewProps> = ({
                       {set.shortCode}
                     </div>
                     <div>
-                      <h3 className="font-bold text-white text-base">{set.displayName}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-bold text-white text-base">{set.displayName}</h3>
+                        {(set.finish || set.numberOfOuts) && (
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                            {set.finish || 'Glossy'} · {set.numberOfOuts || 32} Outs
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs text-[#8E9299]">
                         {totalPos} Positions (P01-P{totalPos < 10 ? '0' + totalPos : totalPos})
                       </span>

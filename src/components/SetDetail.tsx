@@ -266,17 +266,27 @@ export const SetDetail: React.FC<SetDetailProps> = ({
       <div className="bg-[#0F1117] rounded-2xl p-6 text-[#E0E2E5] shadow-xl border border-[#1E222A]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <span className="bg-[#F27D26] text-white font-mono px-3 py-1 rounded-lg text-sm font-bold">
                 {setRecord.shortCode}
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white">{setRecord.displayName}</h2>
+              {setRecord.finish && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                  {setRecord.finish}
+                </span>
+              )}
+              {setRecord.numberOfOuts && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  {setRecord.numberOfOuts} Outs
+                </span>
+              )}
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 {setRecord.status}
               </span>
             </div>
             <p className="text-[#8E9299] text-sm">
-              Master Cycle Reference for all {totalPos} installed plates. Automatic calculation: Current Cycle = Previous + Production.
+              Master Cycle Reference for all {totalPos} installed plates {setRecord.construction ? `(${setRecord.construction})` : ''}. Automatic calculation: Current Cycle = Previous + Production.
             </p>
           </div>
 
@@ -580,7 +590,14 @@ export const SetDetail: React.FC<SetDetailProps> = ({
                 {pos.status === 'OCCUPIED' && plate ? (
                   <div className="space-y-2 my-3">
                     <div className="bg-[#191D28] p-3 rounded-lg border border-[#1E222A]">
-                      <div className="text-xs text-[#F27D26] font-semibold uppercase tracking-wider">Plate Serial No.</div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <div className="text-xs text-[#F27D26] font-semibold uppercase tracking-wider">Plate Serial No.</div>
+                        {(plate.finish || setRecord.finish || plate.numberOfOuts || setRecord.numberOfOuts) && (
+                          <span className="text-[10px] font-mono font-bold text-[#8E9299] bg-[#12141D] px-1.5 py-0.5 rounded border border-[#1E222A]">
+                            {plate.finish || setRecord.finish || 'Standard'} · {plate.numberOfOuts || setRecord.numberOfOuts || 32} Outs
+                          </span>
+                        )}
+                      </div>
                       <div className="font-mono text-base font-bold text-white mt-0.5">{plate.plateSerialNumber}</div>
                     </div>
 

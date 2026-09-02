@@ -739,11 +739,19 @@ export default function App() {
     shortCode: string,
     initialCycle: number,
     numPlates: number = 11,
-    creationDate?: string
+    creationDate?: string,
+    finish: 'Matte' | 'Glossy' = 'Glossy',
+    numberOfOuts: number = 32
   ) => {
-    const existingSetNum = sets.find(s => s.setNumber === setNumber);
-    if (existingSetNum) {
-      throw new Error(`Set Number ${setNumber} already exists (${existingSetNum.displayName}). Please use a unique Set Number.`);
+    const constructionName = displayName.trim() || `${finish.toUpperCase()} ${numberOfOuts} OUTS SET ${setNumber < 10 ? '0' + setNumber : setNumber}`;
+
+    // Validate that the full construction is unique (Set Number can be duplicated across different finishes/outs, but not the same construction)
+    const duplicateConstruction = sets.find(s => 
+      s.displayName.trim().toLowerCase() === constructionName.toLowerCase() ||
+      (s.finish === finish && s.numberOfOuts === numberOfOuts && s.setNumber === setNumber)
+    );
+    if (duplicateConstruction) {
+      throw new Error(`A set with construction "${duplicateConstruction.displayName}" already exists. Set number can be duplicated across different finishes or outs, but the full construction must be unique.`);
     }
 
     const existingCode = sets.find(s => s.shortCode.trim().toLowerCase() === shortCode.trim().toLowerCase());
@@ -764,8 +772,11 @@ export default function App() {
     const newSet: SetRecord = {
       id: setId,
       setNumber,
-      displayName,
+      displayName: constructionName,
       shortCode,
+      finish,
+      numberOfOuts,
+      construction: constructionName,
       status: 'ACTIVE',
       currentTotalCycle: initialCycle,
       initialCycle,
@@ -793,6 +804,9 @@ export default function App() {
         id: plateId,
         plateSerialNumber: serialNumber,
         manufacturingDate: setDateStr,
+        finish,
+        numberOfOuts,
+        construction: constructionName,
         status: 'ACTIVE',
         currentSetId: setId,
         currentPositionId: posId,
@@ -820,6 +834,9 @@ export default function App() {
         positionId: posId,
         installationDate: setDateStr,
         installationCycle: initialCycle,
+        finish,
+        numberOfOuts,
+        construction: constructionName,
         operatorId: currentUser.name,
         remarks: 'Initial installation on set creation',
         createdAt: setCreatedAt
@@ -838,7 +855,7 @@ export default function App() {
       action: 'CREATE_SET',
       timestamp: new Date().toISOString(),
       recordId: setId,
-      reason: `Created new master set ${displayName} (${shortCode}) with ${numPlates} positions`,
+      reason: `Created new master set ${constructionName} (${shortCode}) with ${numPlates} positions [${finish}, ${numberOfOuts} Outs]`,
       deviceInfo: navigator.userAgent
     });
 
@@ -865,6 +882,10 @@ export default function App() {
     const targetSet = sets.find(s => s.id === setId);
     if (!targetSet) return;
 
+    const setFinish = targetSet.finish;
+    const setOuts = targetSet.numberOfOuts;
+    const setConstruction = targetSet.construction || targetSet.displayName;
+
     const plateId = existingPlate ? existingPlate.id : generateUUID();
     const nowIso = new Date().toISOString();
 
@@ -873,6 +894,9 @@ export default function App() {
         id: plateId,
         plateSerialNumber: serialNumber,
         manufacturingDate: mfgDate,
+        finish: setFinish,
+        numberOfOuts: setOuts,
+        construction: setConstruction,
         status: 'ACTIVE',
         currentSetId: setId,
         currentPositionId: positionId,
@@ -882,6 +906,9 @@ export default function App() {
       await db.plates.put(newPlate);
     } else {
       await db.plates.update(plateId, {
+        finish: setFinish || existingPlate.finish,
+        numberOfOuts: setOuts || existingPlate.numberOfOuts,
+        construction: setConstruction || existingPlate.construction,
         status: 'ACTIVE',
         currentSetId: setId,
         currentPositionId: positionId,
@@ -905,6 +932,9 @@ export default function App() {
       installationDate: nowIso.split('T')[0],
       installationCycle: targetSet.currentTotalCycle,
       initialCycles,
+      finish: setFinish,
+      numberOfOuts: setOuts,
+      construction: setConstruction,
       operatorId,
       remarks,
       createdAt: nowIso,
@@ -921,9 +951,8 @@ export default function App() {
       timestamp: nowIso,
       recordId: plateId,
       newValue: serialNumber,
-      reason: `Installed plate at position`,
+      reason: `Installed plate at position in ${setConstruction}`,
       deviceInfo: navigator.userAgent,
-
     });
 
     setSelectedPosModal(null);
@@ -974,6 +1003,9 @@ export default function App() {
       removalDate: nowIso.split('T')[0],
       removalCycle,
       totalCyclesAchieved,
+      finish: targetSet.finish,
+      numberOfOuts: targetSet.numberOfOuts,
+      construction: targetSet.construction || targetSet.displayName,
       status,
       rejectType,
       rejectDescription: rejectDesc,
@@ -994,9 +1026,8 @@ export default function App() {
       timestamp: nowIso,
       recordId: plateId,
       newValue: status,
-      reason: remarks || `Removed plate with achieved life ${totalCyclesAchieved} cycles`,
+      reason: remarks || `Removed plate with achieved life ${totalCyclesAchieved} cycles from ${targetSet.displayName}`,
       deviceInfo: navigator.userAgent,
-
     });
 
     setSelectedPosModal(null);
@@ -1054,6 +1085,9 @@ export default function App() {
       removalDate: installDate,
       removalCycle,
       totalCyclesAchieved,
+      finish: targetSet.finish,
+      numberOfOuts: targetSet.numberOfOuts,
+      construction: targetSet.construction || targetSet.displayName,
       status: evaluationStatus,
       rejectType: primaryRejectType,
       rejectDescription: fullRejectDesc,
@@ -1070,6 +1104,9 @@ export default function App() {
       id: newPlateId,
       plateSerialNumber: newSerialNumber,
       manufacturingDate: installDate,
+      finish: targetSet.finish,
+      numberOfOuts: targetSet.numberOfOuts,
+      construction: targetSet.construction || targetSet.displayName,
       status: 'ACTIVE',
       currentSetId: setId,
       currentPositionId: positionId,
@@ -1092,6 +1129,9 @@ export default function App() {
       installationDate: installDate,
       installationCycle: removalCycle, // Set Total Cycle does not reset!
       initialCycles: 0,
+      finish: targetSet.finish,
+      numberOfOuts: targetSet.numberOfOuts,
+      construction: targetSet.construction || targetSet.displayName,
       operatorId,
       remarks: `Replacement for plate (${evaluationStatus}). Reason: ${reason}`,
       createdAt: nowIso,

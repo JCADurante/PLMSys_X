@@ -5,8 +5,11 @@ export type RejectType = 'WEAR' | 'SURFACE' | 'CRACK' | 'DIM' | 'CHIP' | 'DENT' 
 export interface SetRecord {
   id: string; // UUID
   setNumber: number; // 1 to 100+
-  displayName: string; // "SET 01"
-  shortCode: string; // "S01"
+  displayName: string; // "GLOSSY 32 OUTS SET 01"
+  shortCode: string; // "G32-S01" or "S01"
+  finish?: 'Matte' | 'Glossy' | string;
+  numberOfOuts?: number; // 20 or 32
+  construction?: string; // e.g. "GLOSSY 32 OUTS SET 01"
   status: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE';
   currentTotalCycle: number;
   initialCycle?: number; // Starting cycle on creation
@@ -22,7 +25,7 @@ export interface PositionRecord {
   setNumber: number;
   positionNumber: number; // 1 to 11
   positionCode: string; // "P01"
-  fullCode: string; // "S01-P01"
+  fullCode: string; // "S01-P01" or "G32-S01-P01"
   status: 'OCCUPIED' | 'EMPTY';
   currentPlateId?: string;
   createdAt: string;
@@ -33,6 +36,9 @@ export interface PlateRecord {
   id: string; // UUID
   plateSerialNumber: string; // MMDDYY-SET-POSITION (e.g. 080826-01-05)
   manufacturingDate: string; // YYYY-MM-DD
+  finish?: 'Matte' | 'Glossy' | string;
+  numberOfOuts?: number; // 20 or 32
+  construction?: string; // e.g. "GLOSSY 32 OUTS SET 01"
   status: PlateStatus;
   currentSetId?: string;
   currentPositionId?: string;
@@ -48,6 +54,9 @@ export interface PlateInstallationRecord {
   installationDate: string;
   installationCycle: number;
   initialCycles?: number; // Pre-existing cycles on the plate itself when installed
+  finish?: string;
+  numberOfOuts?: number;
+  construction?: string;
   operatorId: string;
   remarks?: string;
   createdAt: string;
@@ -61,6 +70,9 @@ export interface PlateRemovalRecord {
   removalDate: string;
   removalCycle: number;
   totalCyclesAchieved: number;
+  finish?: string;
+  numberOfOuts?: number;
+  construction?: string;
   status: PlateStatus; // REMOVED, REJECTED, RETIRED, REPLACED
   rejectType?: RejectType;
   rejectDescription?: string;

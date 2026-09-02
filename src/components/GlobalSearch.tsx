@@ -25,10 +25,16 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   const filteredPlates = plates.filter(plate => {
+    const setRecord = sets.find(s => s.id === plate.currentSetId);
+    const constructionText = plate.construction || plate.finish || (setRecord ? setRecord.construction || setRecord.displayName : '');
+
     const matchesSearch =
       plate.plateSerialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       plate.manufacturingDate.includes(searchTerm) ||
-      plate.status.toLowerCase().includes(searchTerm.toLowerCase());
+      plate.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      constructionText.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (plate.finish && plate.finish.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (plate.numberOfOuts && String(plate.numberOfOuts).includes(searchTerm));
 
     const matchesStatus = statusFilter === 'ALL' || plate.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -43,7 +49,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
               <Search className="w-5 h-5 text-[#F27D26]" /> Global Plate Search & Traceability
             </h2>
             <p className="text-xs text-[#8E9299]">
-              Search by Plate Serial Number (e.g. 080826-01-05), Manufacturing Date, or Status with partial matches.
+              Search by Plate Serial Number (e.g. 080826-01-05), Finish (Matte / Glossy), Outs (20 / 32), Manufacturing Date, or Status with partial matches.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -65,7 +71,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
           <Search className="absolute left-4 top-3.5 w-5 h-5 text-[#8E9299]" />
           <input
             type="text"
-            placeholder="Type plate serial number, e.g. 080826-01 or 080826..."
+            placeholder="Search serial, construction, finish, outs, date (e.g. Glossy 32 Outs)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-12 pr-4 py-3 bg-[#191D28] border border-[#1E222A] rounded-xl text-base text-white placeholder-[#8E9299] focus:outline-none focus:ring-2 focus:ring-[#F27D26]"
@@ -77,6 +83,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
             <thead className="sticky top-0 z-10">
               <tr className="bg-[#191D28] text-xs font-semibold text-[#8E9299] uppercase">
                 <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Plate Serial Number</th>
+                <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Construction / Finish</th>
                 <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Status</th>
                 <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Set & Position Location</th>
                 <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Mfg Date</th>
@@ -87,10 +94,21 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
               {filteredPlates.slice(0, 50).map((plate) => {
                 const setRecord = sets.find(s => s.id === plate.currentSetId);
                 const posRecord = positions.find(p => p.id === plate.currentPositionId);
+                const plateFinish = plate.finish || setRecord?.finish;
+                const plateOuts = plate.numberOfOuts || setRecord?.numberOfOuts;
 
                 return (
                   <tr key={plate.id} className="hover:bg-[#191D28]/50">
                     <td className="p-3 font-mono font-bold text-[#F27D26]">{plate.plateSerialNumber}</td>
+                    <td className="p-3">
+                      {plateFinish || plateOuts ? (
+                        <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-[#191D28] text-cyan-300 border border-cyan-500/20">
+                          {plateFinish || 'Glossy'} · {plateOuts || 32} Outs
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[#8E9299]">Standard</span>
+                      )}
+                    </td>
                     <td className="p-3">
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         plate.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
@@ -141,7 +159,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
               })}
               {filteredPlates.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-[#8E9299]">
+                  <td colSpan={6} className="p-8 text-center text-[#8E9299]">
                     No matching plates found.
                   </td>
                 </tr>
