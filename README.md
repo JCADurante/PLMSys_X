@@ -111,8 +111,11 @@ Example: 082926-01-05 (Manufactured Aug 29, 2026, for Set 01, Position P05)
 
 ## 🖥 System Requirements
 
-- **Node.js**: v18.0.0 or higher (v20+ recommended)
 - **Web Browser**: Any modern browser with IndexedDB support (Google Chrome, Microsoft Edge, Mozilla Firefox, Safari).
+- **Web Server Runtime** (Choose any of the 3):
+  1. **Miniserve** (Zero-installation single-binary Rust web server, e.g. `miniserve.exe`)
+  2. **Portable Node.js** (Standalone single `node.exe` dropped in folder)
+  3. **Installed Node.js** (v18.0.0 or higher)
 - **Operating System**: Windows 10/11, macOS, Linux, or factory tablet devices.
 
 ---
@@ -123,12 +126,14 @@ Example: 082926-01-05 (Manufactured Aug 29, 2026, for Set 01, Position P05)
 
 Executable scripts are provided in the root directory:
 
-- **`START.bat`**: Primary Windows launcher. Starts the centralized Node.js server, binds to `0.0.0.0:3000`, displays your local Wi-Fi IP address, and automatically opens the browser.
-- **`INSTALL-AND-RUN.bat`**: Automated first-time setup launcher (runs `npm install`, `npm run build`, and launches the central server).
+- **`START.bat`**: Universal auto-detect launcher. Automatically detects **Portable Node.js**, **Installed Node.js**, or **Miniserve**, displays your local Wi-Fi IP, and opens the browser.
+- **`START-MINISERVE.bat`**: Dedicated launcher for **Miniserve** (ultra-fast single-binary Rust server with zero background dependencies).
+- **`START-PORTABLE-NODE.bat`**: Dedicated launcher for **Portable standalone Node.js** (runs `node.exe server.js` with zero installation).
+- **`INSTALL-AND-RUN.bat`**: Automated first-time setup launcher (runs `npm install`, `npm run build`, and launches the server).
 - **`CHECK-NETWORK.bat`**: Network profile checker & 1-click switcher (checks Public vs Private Wi-Fi status and adds port 3000 firewall allowance).
-- **`DIAGNOSE.bat`**: Windows system diagnostics tool to inspect Node.js and network connectivity.
-- **`START-PRODUCTION.bat`**: Compiles the latest production build and launches the server.
-- **`start.sh`**: Shell launcher for Linux and macOS environments (`./start.sh`).
+- **`DIAGNOSE.bat`**: Diagnostic tool to inspect Node.js, Miniserve, firewall, and LAN connectivity with direct launch shortcuts.
+- **`START-PRODUCTION.bat`**: Production build and launcher with automatic fallback.
+- **`start.sh`**: Multi-runtime shell launcher for Linux and macOS environments (`./start.sh`).
 
 ---
 

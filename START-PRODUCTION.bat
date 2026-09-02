@@ -1,5 +1,5 @@
 @echo off
-TITLE PLMSys - Production Server
+TITLE PLMSys - Production Server Launcher
 cd /d "%~dp0"
 
 ECHO ============================================================
@@ -10,62 +10,88 @@ ECHO.
 :: 1. Check if unextracted ZIP
 if not exist "package.json" (
     ECHO [ERROR] package.json not found in the current directory!
-    ECHO.
-    ECHO It looks like you may be running this script directly from
-    ECHO inside a compressed ZIP file without extracting it first.
-    ECHO.
-    ECHO SOLUTION:
-    ECHO 1. Close this window.
-    ECHO 2. Right-click the downloaded .ZIP file and select "Extract All..."
-    ECHO 3. Open the extracted folder and double-click START-PRODUCTION.bat again.
+    ECHO Please extract all files from the ZIP before running.
     ECHO.
     PAUSE
     EXIT /B 1
 )
 
 :: 2. Check for Portable / Standalone Node.js or System Node.js
+set "NODE_EXEC="
 if exist "%~dp0node.exe" (
     set "PATH=%~dp0;%PATH%"
+    set "NODE_EXEC=%~dp0node.exe"
     ECHO [OK] Using portable standalone Node.js from current folder.
 ) else if exist "%~dp0bin\node.exe" (
     set "PATH=%~dp0bin;%PATH%"
-    ECHO [OK] Using portable Node.js from bin folder.
+    set "NODE_EXEC=%~dp0bin\node.exe"
+    ECHO [OK] Using portable Node.js from bin\ folder.
+) else if exist "%~dp0tools\node.exe" (
+    set "PATH=%~dp0tools;%PATH%"
+    set "NODE_EXEC=%~dp0tools\node.exe"
+    ECHO [OK] Using portable Node.js from tools\ folder.
 ) else if exist "%~dp0nodejs\node.exe" (
     set "PATH=%~dp0nodejs;%PATH%"
-    ECHO [OK] Using portable Node.js from nodejs folder.
+    set "NODE_EXEC=%~dp0nodejs\node.exe"
+    ECHO [OK] Using portable Node.js from nodejs\ folder.
 ) else if exist "%~dp0node\node.exe" (
     set "PATH=%~dp0node;%PATH%"
-    ECHO [OK] Using portable Node.js from node folder.
+    set "NODE_EXEC=%~dp0node\node.exe"
+    ECHO [OK] Using portable Node.js from node\ folder.
 ) else (
     node -v >nul 2>nul
-    if %errorlevel% neq 0 (
-        if exist "C:\Program Files\nodejs\node.exe" set "PATH=C:\Program Files\nodejs;%PATH%"
-        if exist "%LOCALAPPDATA%\Programs\node\node.exe" set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
-        if exist "%ProgramFiles%\nodejs\node.exe" set "PATH=%ProgramFiles%\nodejs;%PATH%"
+    if %errorlevel% equ 0 (
+        set "NODE_EXEC=node"
+        ECHO [OK] Using installed system Node.js.
+    ) else (
+        if exist "C:\Program Files\nodejs\node.exe" set "PATH=C:\Program Files\nodejs;%PATH%" & set "NODE_EXEC=C:\Program Files\nodejs\node.exe"
+        if exist "%LOCALAPPDATA%\Programs\node\node.exe" set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%" & set "NODE_EXEC=%LOCALAPPDATA%\Programs\node\node.exe"
+        if exist "%ProgramFiles%\nodejs\node.exe" set "PATH=%ProgramFiles%\nodejs;%PATH%" & set "NODE_EXEC=%ProgramFiles%\nodejs\node.exe"
     )
 )
 
-node -v >nul 2>nul
-if %errorlevel% neq 0 (
-    ECHO [ERROR] Node.js is NOT found on this computer.
-    ECHO You can drop node.exe into this folder or install Node.js from https://nodejs.org/
+:: If Node is missing, check if miniserve is available
+if "%NODE_EXEC%"=="" (
+    if exist "%~dp0miniserve.exe" (
+        ECHO [OK] Node.js not found, but portable miniserve.exe is present!
+        CALL "%~dp0START-MINISERVE.bat"
+        EXIT /B 0
+    ) else if exist "%~dp0bin\miniserve.exe" (
+        ECHO [OK] Node.js not found, but portable miniserve.exe in bin\ is present!
+        CALL "%~dp0START-MINISERVE.bat"
+        EXIT /B 0
+    ) else (
+        where miniserve >nul 2>nul
+        if %errorlevel% equ 0 (
+            ECHO [OK] System miniserve detected!
+            CALL "%~dp0START-MINISERVE.bat"
+            EXIT /B 0
+        )
+    )
+
+    ECHO [ERROR] Neither Node.js nor Miniserve was found on this computer.
+    ECHO You can drop node.exe or miniserve.exe into this folder, or install Node.js from https://nodejs.org/
     ECHO.
     PAUSE
     EXIT /B 1
 )
 
-ECHO [OK] Node.js is installed!
-node -v
+ECHO [OK] Node.js is ready:
+"%NODE_EXEC%" -v
 ECHO.
 
 :: 3. Check if node_modules directory exists
 if not exist "node_modules\" (
-    ECHO [INFO] Installing required dependencies...
-    CALL npm install
-    if %errorlevel% neq 0 (
-        ECHO [ERROR] Dependency installation failed!
-        PAUSE
-        EXIT /B 1
+    if exist "dist\index.html" (
+        ECHO [OK] Pre-compiled dist bundle found. Running zero-dependency server...
+    ) else (
+        ECHO [INFO] Installing dependencies via npm...
+        CALL npm install
+        if %errorlevel% neq 0 (
+            ECHO [ERROR] Dependency installation failed!
+            PAUSE
+            EXIT /B 1
+        )
     )
 )
 
@@ -90,7 +116,7 @@ ECHO  PLMSys Production Server active! Keep this window open.
 ECHO  To stop the server, press Ctrl+C in this window.
 ECHO ============================================================
 ECHO.
-CALL npm start
+"%NODE_EXEC%" server.js
 
 if %errorlevel% neq 0 (
     ECHO.

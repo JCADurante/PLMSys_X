@@ -1,54 +1,70 @@
 ================================================================================
-PLMSys - HOW TO RUN ON WINDOWS / LINUX / MACOS
+PLMSys - HOW TO RUN (SUPPORTS MINISERVE, PORTABLE NODE, & INSTALLED NODE)
 ================================================================================
 
---------------------------------------------------------------------------------
-PORTABLE STANDALONE NODE.JS (ZERO INSTALLATION REQUIRED)
---------------------------------------------------------------------------------
-If you do NOT want to install Node.js on your computer (or don't have admin rights):
-1. Download standalone `node.exe` (e.g. from https://nodejs.org/dist/latest/win-x64/node.exe or the official Node.js .zip package).
-2. Place `node.exe` directly inside the PLMSys folder.
-3. Double-click `START.bat`.
-   - `START.bat` will automatically detect the local `node.exe` and start `server.js` without any installation or system configuration needed!
-   - `server.js` has zero external npm dependencies and runs 100% offline.
+PLMSys offers 3 flexible ways to run on Windows, Linux, and macOS without requiring 
+any complex setup or administrative privileges.
 
 --------------------------------------------------------------------------------
-QUICK START (WINDOWS)
+OPTION 1: MINISERVE (ZERO-INSTALLATION SINGLE BINARY)
 --------------------------------------------------------------------------------
-1. Extract the downloaded ZIP file to a folder (e.g. C:\PLMSys).
-2. Double-click START.bat (or INSTALL-AND-RUN.bat)
-   - It will install packages, build the bundle if needed, and start the server.
-   - It will automatically launch http://localhost:3000 in your browser.
-   - Other phones, tablets, and PCs on your Wi-Fi/LAN can open:
-     http://<YOUR_PC_IP>:3000
+Miniserve is a high-performance, single-executable web server (written in Rust).
+It runs PLMSys at maximum speed with zero background runtimes.
 
---------------------------------------------------------------------------------
-HELPER SCRIPTS INCLUDED
---------------------------------------------------------------------------------
-- START.bat: Standard one-click server starter.
-- INSTALL-AND-RUN.bat: Automated first-time setup (runs npm install & build & server).
-- CHECK-NETWORK.bat: Checks if your Wi-Fi is Public or Private, and lets you switch to Private & open port 3000 with 1 click.
-- DIAGNOSE.bat: Diagnostic tool to check your Node.js, firewall, and LAN IP.
+1. Download `miniserve-win-x86_64.exe` from:
+   https://github.com/svenstaro/miniserve/releases
+2. Rename the downloaded file to `miniserve.exe` and place it in this project folder.
+3. Double-click `START-MINISERVE.bat` (or `START.bat`).
+   - The server will immediately bind to port 3000 and open http://localhost:3000
+   - Fully supports tablets, phones, and shop-floor PCs over Wi-Fi!
 
 --------------------------------------------------------------------------------
-TROUBLESHOOTING & COMMON SOLUTIONS
+OPTION 2: PORTABLE STANDALONE NODE.JS (ZERO-INSTALLATION NODE)
 --------------------------------------------------------------------------------
+If you want the centralized multi-device JSON synchronization server without 
+installing Node.js or needing Administrator rights:
 
-1. "THIS SITE CANNOT BE REACHED" FROM PHONE / TABLET:
-   - Double-click CHECK-NETWORK.bat and choose option [3] to set your network to Private and open port 3000.
+1. Download standalone `node.exe` (Windows x64) from:
+   https://nodejs.org/dist/latest/win-x64/node.exe
+2. Place `node.exe` directly inside this project folder (or in a `bin\` subfolder).
+3. Double-click `START-PORTABLE-NODE.bat` (or `START.bat`).
+   - `START.bat` will automatically detect the local `node.exe` and start `server.js`.
+   - `server.js` has ZERO external npm runtime dependencies and runs 100% offline.
 
-2. RUNNING FROM INSIDE THE .ZIP FILE:
-   - If you double-click START.bat from inside a zip, extract all files first!
-   - Right-click the zip file -> "Extract All..." -> Open the extracted folder.
+--------------------------------------------------------------------------------
+OPTION 3: INSTALLED NODE.JS (STANDARD SYSTEM INSTALL)
+--------------------------------------------------------------------------------
+If you already have Node.js installed or prefer a standard setup:
 
-3. WINDOWS SMARTSCREEN WARNING:
-   - Click "More info" -> "Run anyway".
+1. Download and install Node.js (v18+) from: https://nodejs.org/
+2. Double-click `START.bat` (or `INSTALL-AND-RUN.bat`).
+3. The launcher will automatically build frontend assets if needed, display 
+   your LAN IP addresses, and launch http://localhost:3000 in your web browser.
 
-4. MANUAL RUN VIA COMMAND PROMPT:
-   - Open your project folder in File Explorer.
-   - Click the top address bar, type "cmd" and press Enter.
-   - Type:
-       node server.js
-     and press Enter.
+--------------------------------------------------------------------------------
+LAUNCHER SCRIPT REFERENCE
+--------------------------------------------------------------------------------
+- START.bat               : Universal launcher (Auto-detects Portable Node, 
+                            Installed Node, or Miniserve automatically).
+- START-MINISERVE.bat     : Dedicated launcher for Miniserve single-binary server.
+- START-PORTABLE-NODE.bat : Dedicated launcher for Portable Node.js.
+- START-PRODUCTION.bat    : Production build & launcher.
+- INSTALL-AND-RUN.bat     : First-time setup & dependency installer.
+- CHECK-NETWORK.bat       : 1-Click Wi-Fi Private network & Firewall port 3000 opener.
+- DIAGNOSE.bat            : Environment troubleshooter & runtime detector.
+- start.sh                : Multi-runtime launcher for Linux / macOS.
+
+--------------------------------------------------------------------------------
+MULTI-DEVICE / TABLET ACCESS ON WI-FI & LAN
+--------------------------------------------------------------------------------
+1. Start the server using any of the methods above on your host computer.
+2. Note the Local Area Network IPv4 address shown in the console window (e.g., 192.168.1.50).
+3. On any phone, tablet, or secondary PC connected to the same Wi-Fi:
+   Open browser and navigate to:
+   http://192.168.1.50:3000
+
+TROUBLESHOOTING FIREWALL / CONNECTION ISSUES:
+- If tablets cannot connect, double-click `CHECK-NETWORK.bat` and choose option [3] 
+  to ensure your Windows Wi-Fi profile is set to Private and port 3000 is allowed.
 
 ================================================================================
