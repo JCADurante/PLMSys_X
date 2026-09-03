@@ -12,6 +12,34 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Anti-caching headers for all API requests to ensure multiple PCs always get fresh database data
+app.use('/api', (req: Request, res: Response, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
+
+// SSE (Server-Sent Events) clients for zero-latency multi-PC database synchronization
+const sseClients = new Set<Response>();
+
+function broadcastRevision(revision: number) {
+  const payload = JSON.stringify({
+    type: 'SYNC_UPDATE',
+    revision,
+    lastUpdated: serverDb.lastUpdated,
+    timestamp: Date.now()
+  });
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${payload}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // Persistent Storage Engine (data/plmsys_database.json)
 // -------------------------------------------------------------
@@ -76,6 +104,7 @@ function persistDatabase() {
     serverDb.revision = (serverDb.revision || 0) + 1;
     serverDb.lastUpdated = new Date().toISOString();
     fs.writeFileSync(DB_FILE, JSON.stringify(serverDb, null, 2), 'utf-8');
+    broadcastRevision(serverDb.revision);
   } catch (err) {
     console.error('[PLMSys Server] Failed to persist database to disk:', err);
   }
@@ -162,7 +191,7 @@ function loadOrInitDatabase() {
         installationDate: todayStr,
         installationCycle: 0,
         initialCycles: 0,
-        operatorId: 'Admin',
+        operatorId: '-',
         remarks: 'Factory Setup',
         createdAt: new Date().toISOString()
       });
@@ -211,7 +240,28 @@ app.get('/api/server-info', (req: Request, res: Response) => {
   });
 });
 
-// 3. Sync Version Check (Ultra-lightweight for 3.5s polling)
+// 3. Real-Time SSE Stream for Instant LAN Sync Across Multiple PCs
+app.get('/api/sync/events', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  sseClients.add(res);
+  res.write(`data: ${JSON.stringify({
+    type: 'INIT',
+    revision: serverDb.revision || 1,
+    lastUpdated: serverDb.lastUpdated,
+    timestamp: Date.now()
+  })}\n\n`);
+
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
+
+// 4. Sync Version Check (Ultra-lightweight fallback polling)
 app.get('/api/sync/version', (req: Request, res: Response) => {
   res.json({
     success: true,
@@ -454,8 +504,19 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
+    }));
     app.get('*', (req: Request, res: Response) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

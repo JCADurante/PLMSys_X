@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User as UserIcon, Lock, Shield, ArrowRight } from 'lucide-react';
-import { User, Personnel } from '../types';
+import { User, Personnel, getAppRoleFromPersonnel } from '../types';
 
 interface LoginModalProps {
   onClose?: () => void;
@@ -23,27 +23,41 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminPassword.trim()) {
-      setError('Please enter administrator password');
+    const trimmedPw = adminPassword.trim();
+    if (!trimmedPw) {
+      setError('Please enter your unique password');
       return;
     }
 
-    const matchedAdmin = personnel.find(
-      (p) =>
-        (p.position === 'Admin' || p.fullName === 'Administrator' || p.isAuthorized) &&
-        (p.password === adminPassword || adminPassword === 'JADB1994')
+    // Match solely based on the entered password
+    const matchedUser = personnel.find(
+      (p) => p.password && p.password.trim() === trimmedPw
     );
 
-    if (matchedAdmin || adminPassword === 'JADB1994') {
+    if (matchedUser) {
+      const userRole = getAppRoleFromPersonnel(matchedUser);
       onLogin({
-        name: matchedAdmin ? matchedAdmin.fullName : 'Administrator',
+        name: matchedUser.fullName,
+        role: userRole
+      });
+      if (onClose) onClose();
+      return;
+    }
+
+    if (trimmedPw === 'JADB1994') {
+      const defaultAdmin = personnel.find(
+        (p) => p.fullName === 'Administrator' || p.position === 'Admin' || p.role === 'Admin'
+      );
+      onLogin({
+        name: defaultAdmin ? defaultAdmin.fullName : 'Administrator',
         role: 'ADMIN'
       });
       if (onClose) onClose();
-    } else {
-      setError('Invalid administrator password.');
-      setTimeout(() => setError(''), 3000);
+      return;
     }
+
+    setError('Invalid password. Please check your password or contact an Administrator.');
+    setTimeout(() => setError(''), 3000);
   };
 
   return (
@@ -75,7 +89,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
                 <ArrowRight className="w-5 h-5 text-[#8E9299] group-hover:text-sky-400 group-hover:translate-x-1 transition-all" />
               </button>
 
-              {/* Option 2: Log as Admin */}
+              {/* Option 2: Authorized Sign-in */}
               <button
                 type="button"
                 onClick={() => {
@@ -91,10 +105,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
                   </div>
                   <div>
                     <div className="text-sm font-bold text-white group-hover:text-[#F27D26] transition-colors">
-                      Log as Admin
+                      Authorized Sign-in
                     </div>
                     <div className="text-xs text-[#8E9299]">
-                      Full access to Admin Dashboard, DB Studio & System Controls
+                      Leadman, Supervisor, or Administrator login
                     </div>
                   </div>
                 </div>
@@ -102,11 +116,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
               </button>
             </div>
           ) : (
-            /* Admin Password Form without password suggestion */
+            /* Authorized Password Form */
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="flex items-center gap-2 text-xs font-bold text-[#F27D26] uppercase tracking-wider">
                 <Lock className="w-4 h-4" />
-                Administrator Password Required
+                Authorized User Password
               </div>
 
               {error && (
@@ -121,12 +135,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
                 </label>
                 <input
                   type="password"
-                  placeholder="Enter administrator password"
+                  placeholder="Enter your personal password"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
                   className="w-full p-3 bg-[#141720] text-white rounded-lg border border-[#1E222A] focus:border-[#F27D26] text-xs outline-none"
                   autoFocus
                 />
+                <span className="text-[10px] text-[#8E9299] block mt-1">
+                  The system automatically identifies your identity and role from your unique password.
+                </span>
               </div>
 
               <div className="pt-2 flex items-center justify-between gap-3">
@@ -143,7 +160,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, person
                   className="px-5 py-2.5 bg-[#F27D26] hover:bg-[#d96a1f] text-white text-xs font-bold rounded-lg shadow-lg shadow-[#F27D26]/20 cursor-pointer transition-all flex items-center gap-2"
                 >
                   <Shield className="w-4 h-4" />
-                  Sign In as Admin
+                  Sign In
                 </button>
               </div>
             </form>

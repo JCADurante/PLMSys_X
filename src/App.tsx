@@ -13,7 +13,8 @@ import {
   Personnel,
   User,
   PlateStatus,
-  RejectType
+  RejectType,
+  getPersonnelRole
 } from './types';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
@@ -255,7 +256,9 @@ export default function App() {
     await db.auditLogs.put({
       id: generateUUID(),
       auditCode,
-      user: currentUser.name,
+      user: currentUser.name || (currentUser.role === 'ADMIN' ? 'Admin' : 'Operator'),
+      operator: '-',
+      userRole: currentUser.role === 'ADMIN' ? 'Admin' : 'Operator',
       action: 'EDIT_SET',
       timestamp: new Date().toISOString(),
       recordId: setId,
@@ -263,7 +266,6 @@ export default function App() {
       newValue: `${displayName} (${shortCode}) - ${status} - ${currentTotalCycle}`,
       reason: `Updated details of Set: ${displayName}`,
       deviceInfo: navigator.userAgent,
-
     });
 
     await mutateAndSync();
@@ -429,8 +431,8 @@ export default function App() {
   };
 
   const handleDeleteSet = async (setId: string, reason?: string) => {
-    if (currentUser.role !== 'ADMIN') {
-      alert('Access Denied: Only Administrator accounts can delete machine sets.');
+    if (currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPERVISOR' && currentUser.role !== 'LEADMAN') {
+      alert('Access Denied: Only authorized personnel (Admin, Supervisor, Leadman) can delete machine sets.');
       return;
     }
     try {
@@ -481,7 +483,9 @@ export default function App() {
       await db.auditLogs.put({
         id: generateUUID(),
         auditCode,
-        user: currentUser.name,
+        user: currentUser.name || (currentUser.role === 'ADMIN' ? 'Admin' : 'Operator'),
+        operator: '-',
+        userRole: currentUser.role === 'ADMIN' ? 'Admin' : 'Operator',
         action: 'DELETE_SET',
         timestamp: new Date().toISOString(),
         recordId: setId,
@@ -503,8 +507,8 @@ export default function App() {
   };
 
   const handleDeleteProduction = async (prodId: string, reason?: string) => {
-    if (currentUser.role !== 'ADMIN') {
-      alert('Access Denied: Only Administrator accounts can delete production logs.');
+    if (currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPERVISOR' && currentUser.role !== 'LEADMAN') {
+      alert('Access Denied: Only authorized personnel (Admin, Supervisor, Leadman) can delete production logs.');
       return;
     }
     try {
@@ -564,8 +568,8 @@ export default function App() {
     updatedFields: Partial<DailyProductionRecord>,
     reason: string
   ) => {
-    if (currentUser.role !== 'ADMIN') {
-      alert('Access Denied: Only Administrator accounts can edit production logs.');
+    if (currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPERVISOR' && currentUser.role !== 'LEADMAN') {
+      alert('Access Denied: Only authorized personnel (Admin, Supervisor, Leadman) can edit production logs.');
       return;
     }
     try {
@@ -673,8 +677,8 @@ export default function App() {
     logType: 'installation' | 'removal' | 'replacement',
     reason?: string
   ) => {
-    if (currentUser.role !== 'ADMIN') {
-      alert('Access Denied: Only Administrator accounts can delete plate logs.');
+    if (currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPERVISOR' && currentUser.role !== 'LEADMAN') {
+      alert('Access Denied: Only authorized personnel (Admin, Supervisor, Leadman) can delete plate logs.');
       return;
     }
     try {
@@ -837,7 +841,7 @@ export default function App() {
         finish,
         numberOfOuts,
         construction: constructionName,
-        operatorId: currentUser.name,
+        operatorId: '-',
         remarks: 'Initial installation on set creation',
         createdAt: setCreatedAt
       });
@@ -847,11 +851,14 @@ export default function App() {
     await db.plates.bulkPut(platesToCreate);
     await db.plateInstallations.bulkPut(installationsToCreate);
 
+    const userRoleText = currentUser.role === 'ADMIN' ? 'Admin' : 'Operator';
     const auditCode = `AUD-${String(auditLogs.length + 1).padStart(6, '0')}`;
     await db.auditLogs.put({
       id: generateUUID(),
       auditCode,
-      user: currentUser.name,
+      user: userRoleText,
+      operator: '-',
+      userRole: userRoleText,
       action: 'CREATE_SET',
       timestamp: new Date().toISOString(),
       recordId: setId,
@@ -1269,13 +1276,29 @@ export default function App() {
   };
 
   const handleRemovePersonnel = async (id: string) => {
+    const target = personnel.find(p => p.id === id);
+    if (target) {
+      const targetRole = getPersonnelRole(target);
+      if (currentUser.role === 'LEADMAN' && (targetRole === 'Admin' || targetRole === 'Supervisor')) {
+        alert('Access Denied: Leadman accounts cannot delete Supervisor or Admin accounts.');
+        return;
+      }
+      if (currentUser.role === 'SUPERVISOR' && targetRole === 'Admin') {
+        alert('Access Denied: Supervisor accounts cannot delete Admin accounts.');
+        return;
+      }
+      if (currentUser.role === 'OPERATOR') {
+        alert('Access Denied: Operator accounts cannot delete personnel records.');
+        return;
+      }
+    }
     await db.personnel.delete(id);
     await mutateAndSync();
   };
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    if (user.role !== 'ADMIN' && (activeTab === 'admin' || activeTab === 'database')) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPERVISOR' && (activeTab === 'admin' || activeTab === 'database')) {
       setActiveTab('dashboard');
     }
     setShowLoginModal(false);
@@ -1287,8 +1310,12 @@ export default function App() {
     setShowLoginModal(true);
   };
 
-  const handleAdminLogin = () => {
-    setCurrentUser({ name: 'Admin', role: 'ADMIN' });
+  const handleAdminLogin = (user?: User) => {
+    if (user) {
+      setCurrentUser(user);
+    } else {
+      setCurrentUser({ name: 'Admin', role: 'ADMIN' });
+    }
     setShowAdminLoginModal(false);
   };
 
@@ -1422,7 +1449,7 @@ export default function App() {
             {activeTab === 'audit' && (
               <AuditLogView auditLogs={auditLogs} sets={sets} positions={positions} plates={plates} />
             )}
-            {(activeTab === 'admin' || activeTab === 'database') && currentUser.role === 'ADMIN' && (
+            {(activeTab === 'admin' || activeTab === 'database') && (currentUser.role === 'ADMIN' || currentUser.role === 'SUPERVISOR') && (
               <AdminDashboard 
                 sets={sets}
                 positions={positions}
@@ -1508,6 +1535,7 @@ export default function App() {
           {showRegistryModal && (
             <RegistryModal
               personnel={personnel}
+              currentUser={currentUser}
               onAdd={handleAddPersonnel}
               onRemove={handleRemovePersonnel}
               onClose={() => setShowRegistryModal(false)}

@@ -188,14 +188,14 @@ export const ManageSetView: React.FC<ManageSetViewProps> = ({
                     >
                       {set.status}
                     </span>
-                    {currentUser?.role === 'ADMIN' && onDeleteSet && (
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERVISOR' || currentUser?.role === 'LEADMAN') && onDeleteSet && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSetToDelete(set);
                         }}
-                        title="Delete Set (Admin Only)"
+                        title="Delete Set"
                         className="p-1 text-[#8E9299] hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />

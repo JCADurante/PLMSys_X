@@ -104,7 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
           <div className="d-flex align-items-center gap-3 flex-wrap">
-            {currentUser.role === 'ADMIN' && (
+            {(currentUser.role === 'ADMIN' || currentUser.role === 'SUPERVISOR' || currentUser.role === 'LEADMAN') && (
               <button
                 onClick={onOpenRegistry}
                 className="btn btn-primary d-inline-flex align-items-center gap-2 shadow-sm"

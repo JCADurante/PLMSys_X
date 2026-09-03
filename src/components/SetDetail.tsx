@@ -291,7 +291,7 @@ export const SetDetail: React.FC<SetDetailProps> = ({
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {currentUser?.role === 'ADMIN' && onDeleteSet && (
+            {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERVISOR' || currentUser?.role === 'LEADMAN') && onDeleteSet && (
               <button
                 type="button"
                 onClick={() => {

@@ -7,9 +7,11 @@ import {
   Sliders,
   Shield,
   HelpCircle,
-  LogOut
+  LogOut,
+  RefreshCw
 } from 'lucide-react';
 import { User as UserType, SetRecord } from '../types';
+import { centralSync, SyncStatus } from '../services/centralSyncService';
 
 interface NavbarProps {
   activeTab: 'dashboard' | 'manage-set' | 'production' | 'search' | 'audit' | 'database' | 'admin';
@@ -38,6 +40,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenTutorial,
 }) => {
+  const [syncStatus, setSyncStatus] = React.useState<SyncStatus>(centralSync.getStatus());
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  useEffect(() => {
+    return centralSync.subscribeStatus((st) => setSyncStatus(st));
+  }, []);
+
+  const handleForceRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await centralSync.forceHardRefreshFromServer();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
   // Global Keyboard Shortcuts (Alt+1 to Alt+6)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         } else if (e.key === '5') {
           e.preventDefault();
           setActiveTab('audit');
-        } else if ((e.key === '6' || e.key.toLowerCase() === 'a') && currentUser.role === 'ADMIN') {
+        } else if ((e.key === '6' || e.key.toLowerCase() === 'a') && (currentUser.role === 'ADMIN' || currentUser.role === 'SUPERVISOR')) {
           e.preventDefault();
           setActiveTab('admin');
         }
@@ -75,9 +93,37 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveTab, onOpenTutorial, currentUser.role]);
 
-  // Check if role is redundant with username
-  const isRedundantRole =
-    currentUser.name.trim().toLowerCase() === currentUser.role.trim().toLowerCase();
+  const getRoleBadge = () => {
+    switch (currentUser.role) {
+      case 'ADMIN':
+        return {
+          bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+          dot: 'bg-amber-400',
+          label: currentUser.name && currentUser.name !== 'Admin' && currentUser.name !== 'Administrator' ? `${currentUser.name} (Admin)` : 'Admin'
+        };
+      case 'SUPERVISOR':
+        return {
+          bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+          dot: 'bg-purple-400',
+          label: currentUser.name && currentUser.name !== 'Supervisor' ? `${currentUser.name} (Supervisor)` : 'Supervisor'
+        };
+      case 'LEADMAN':
+        return {
+          bg: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
+          dot: 'bg-teal-400',
+          label: currentUser.name && currentUser.name !== 'Leadman' ? `${currentUser.name} (Leadman)` : 'Leadman'
+        };
+      case 'OPERATOR':
+      default:
+        return {
+          bg: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+          dot: 'bg-sky-400',
+          label: 'Operator'
+        };
+    }
+  };
+
+  const badge = getRoleBadge();
 
   return (
     <header className="navbar-custom sticky-top shadow-sm border-bottom border-secondary">
@@ -103,13 +149,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               </div>
               <div className="d-flex align-items-center gap-1 mt-0.5">
-                <span className={`badge px-1.5 py-0.5 rounded text-[10px] fw-bold d-inline-flex align-items-center gap-1 ${
-                  currentUser.role === 'ADMIN'
-                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                    : 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${currentUser.role === 'ADMIN' ? 'bg-amber-400' : 'bg-sky-400'}`} />
-                  {currentUser.role === 'ADMIN' ? 'Admin' : 'Operator'}
+                <span className={`badge px-1.5 py-0.5 rounded text-[10px] fw-bold d-inline-flex align-items-center gap-1 border ${badge.bg}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                  {badge.label}
                 </span>
               </div>
             </div>
@@ -174,7 +216,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Audit Log</span>
           </button>
 
-          {currentUser.role === 'ADMIN' && (
+          {(currentUser.role === 'ADMIN' || currentUser.role === 'SUPERVISOR') && (
             <button
               onClick={() => setActiveTab('admin')}
               className={`header-nav-btn ${activeTab === 'admin' || activeTab === 'database' ? 'active' : ''}`}
@@ -186,8 +228,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </nav>
 
-        {/* Right: Top Most Right Log Out Button */}
+        {/* Right: Real-time Central PC Sync Indicator + Force Refresh + Log Out */}
         <div className="d-flex align-items-center gap-2 flex-shrink-0">
+          {/* Quick Clear Cache & Load Central DB Button */}
+          <button
+            type="button"
+            onClick={handleForceRefresh}
+            disabled={isRefreshing}
+            className={`d-flex align-items-center justify-content-center p-2 rounded border transition-all cursor-pointer shadow-sm ${
+              syncStatus.connected
+                ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-400'
+            }`}
+            title={
+              syncStatus.connected
+                ? `Connected to Central Main PC (rev ${syncStatus.serverRevision}). Click to clear browser cache and reload latest database instantly.`
+                : 'Attempting connection to Central Main PC... Click to retry and reload database.'
+            }
+            aria-label="Refresh and sync database"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+
           <button
             type="button"
             onClick={onLogout || onOpenLogin}

@@ -39,6 +39,7 @@ class CentralSyncService {
   private currentRevision = 0;
   private isSyncing = false;
   private syncInterval: any = null;
+  private eventSource: EventSource | null = null;
   private listeners: Array<(status: SyncStatus) => void> = [];
   private onRemoteDataChangedCallback: (() => Promise<void>) | null = null;
   private status: SyncStatus = {
@@ -78,16 +79,96 @@ class CentralSyncService {
   }
 
   /**
+   * Clears browser CacheStorage to prevent any stale HTML/JS/API cache
+   */
+  public async clearBrowserCache() {
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+        console.log('[PLMSys Sync] Browser CacheStorage cleared');
+      }
+    } catch (err) {
+      console.warn('[PLMSys Sync] Cache clearing notice:', err);
+    }
+  }
+
+  /**
+   * Connect to real-time Server-Sent Events stream for instant LAN updates
+   */
+  public connectSSE() {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
+    if (this.eventSource) {
+      try {
+        this.eventSource.close();
+      } catch {
+        // ignore
+      }
+      this.eventSource = null;
+    }
+
+    try {
+      this.eventSource = new EventSource(`/api/sync/events?_t=${Date.now()}`);
+
+      this.eventSource.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && typeof data.revision === 'number') {
+            this.status.serverRevision = data.revision;
+            this.status.connected = true;
+            if (data.revision !== this.currentRevision) {
+              console.log(`[PLMSys Sync] Instant SSE update notification (local: ${this.currentRevision} -> server: ${data.revision}). Refreshing...`);
+              await this.pullFromServer();
+            } else {
+              this.notifyStatus();
+            }
+          }
+        } catch (e) {
+          console.warn('[PLMSys Sync] SSE message parse warning:', e);
+        }
+      };
+
+      this.eventSource.onerror = () => {
+        this.status.connected = false;
+        this.notifyStatus();
+        try {
+          this.eventSource?.close();
+        } catch {
+          // ignore
+        }
+        this.eventSource = null;
+        setTimeout(() => {
+          if (!this.eventSource) {
+            this.connectSSE();
+          }
+        }, 4000);
+      };
+    } catch (err) {
+      console.warn('[PLMSys Sync] SSE setup notice:', err);
+    }
+  }
+
+  /**
    * Initial synchronization with Node.js Server on application boot
+   * Ensures browser cache is purged and loads the true database from the central server.
    */
   public async initSync(): Promise<boolean> {
+    await this.clearBrowserCache();
+
     try {
-      const res = await fetch('/api/sync/all', {
-        headers: { 'Cache-Control': 'no-cache' }
+      const res = await fetch(`/api/sync/all?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
+
       if (!res.ok) {
         this.status.connected = false;
         this.notifyStatus();
+        this.startBackgroundSync();
         return false;
       }
 
@@ -100,16 +181,17 @@ class CentralSyncService {
         this.status.lastSyncTime = new Date().toLocaleTimeString();
         localStorage.setItem('plmsys_sync_revision', String(this.currentRevision));
 
-        // Populate local IndexedDB from the central server
+        // Atomically replace local IndexedDB with central database
         await this.populateLocalDbFromPayload(json.data);
         this.notifyStatus();
+        this.connectSSE();
         this.startBackgroundSync();
         return true;
       }
-    } catch {
+    } catch (err) {
+      console.warn('[PLMSys Sync] Initial sync failed, fallback to local cache:', err);
       this.status.connected = false;
       this.notifyStatus();
-      // Retry periodically even if initially offline
       this.startBackgroundSync();
     }
     return false;
@@ -123,7 +205,7 @@ class CentralSyncService {
 
     this.syncInterval = setInterval(async () => {
       await this.checkForRemoteUpdates();
-    }, 3500);
+    }, 2500);
 
     // Also check immediately when browser tab regains focus
     window.addEventListener('focus', () => {
@@ -136,18 +218,32 @@ class CentralSyncService {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
     }
+    if (this.eventSource) {
+      try {
+        this.eventSource.close();
+      } catch {
+        // ignore
+      }
+      this.eventSource = null;
+    }
   }
 
   /**
-   * Checks if server revision is higher than local revision
+   * Checks if server revision differs from local revision
    */
   public async checkForRemoteUpdates() {
     if (this.isSyncing) return;
 
     try {
-      const res = await fetch('/api/sync/version', {
-        headers: { 'Cache-Control': 'no-cache' }
+      const res = await fetch(`/api/sync/version?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
+
       if (!res.ok) {
         if (this.status.connected) {
           this.status.connected = false;
@@ -162,9 +258,9 @@ class CentralSyncService {
         this.status.connected = true;
         this.status.serverRevision = json.revision;
 
-        // If server has newer data than we have locally, pull and apply
-        if (json.revision > this.currentRevision) {
-          console.log(`[PLMSys Sync] Remote update detected (rev ${this.currentRevision} -> ${json.revision}). Syncing...`);
+        // If server revision differs from local revision, pull immediately
+        if (json.revision !== this.currentRevision) {
+          console.log(`[PLMSys Sync] Remote update detected (local: ${this.currentRevision} -> server: ${json.revision}). Syncing...`);
           await this.pullFromServer();
         } else if (!wasConnected) {
           this.notifyStatus();
@@ -181,19 +277,26 @@ class CentralSyncService {
   /**
    * Pulls the complete dataset from the central Node server and updates local Dexie
    */
-  public async pullFromServer() {
-    if (this.isSyncing) return;
+  public async pullFromServer(force = false): Promise<boolean> {
+    if (this.isSyncing && !force) return false;
     this.isSyncing = true;
 
     try {
-      const res = await fetch('/api/sync/all', {
-        headers: { 'Cache-Control': 'no-cache' }
+      const res = await fetch(`/api/sync/all?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
-      if (!res.ok) return;
+
+      if (!res.ok) return false;
 
       const json = await res.json();
       if (json.success && json.data) {
         this.currentRevision = json.revision || (this.currentRevision + 1);
+        this.status.connected = true;
         this.status.serverRevision = this.currentRevision;
         this.status.localRevision = this.currentRevision;
         this.status.lastSyncTime = new Date().toLocaleTimeString();
@@ -206,12 +309,26 @@ class CentralSyncService {
         }
 
         this.notifyStatus();
+        return true;
       }
     } catch (err) {
       console.warn('[PLMSys Sync] Failed to pull latest data from server:', err);
     } finally {
       this.isSyncing = false;
     }
+    return false;
+  }
+
+  /**
+   * User or system-initiated force hard refresh:
+   * Clears browser cache, resets revision, and pulls pristine database from server
+   */
+  public async forceHardRefreshFromServer(): Promise<boolean> {
+    await this.clearBrowserCache();
+    this.currentRevision = 0;
+    localStorage.removeItem('plmsys_sync_revision');
+    const success = await this.pullFromServer(true);
+    return success;
   }
 
   /**
@@ -307,44 +424,48 @@ class CentralSyncService {
       db.auditLogs,
       db.personnel
     ], async () => {
+      // Unconditionally wipe all local IndexedDB tables so this PC's local cache mirrors the central database exactly
+      await Promise.all([
+        db.sets.clear(),
+        db.positions.clear(),
+        db.plates.clear(),
+        db.plateInstallations.clear(),
+        db.plateRemovals.clear(),
+        db.dailyProduction.clear(),
+        db.replacements.clear(),
+        db.jobOrders.clear(),
+        db.auditLogs.clear(),
+        db.personnel.clear()
+      ]);
+
       if (payload.sets && payload.sets.length > 0) {
-        await db.sets.clear();
         await db.sets.bulkPut(payload.sets);
       }
       if (payload.positions && payload.positions.length > 0) {
-        await db.positions.clear();
         await db.positions.bulkPut(payload.positions);
       }
       if (payload.plates && payload.plates.length > 0) {
-        await db.plates.clear();
         await db.plates.bulkPut(payload.plates);
       }
       if (payload.installations && payload.installations.length > 0) {
-        await db.plateInstallations.clear();
         await db.plateInstallations.bulkPut(payload.installations);
       }
-      if (payload.removals) {
-        await db.plateRemovals.clear();
-        if (payload.removals.length > 0) await db.plateRemovals.bulkPut(payload.removals);
+      if (payload.removals && payload.removals.length > 0) {
+        await db.plateRemovals.bulkPut(payload.removals);
       }
-      if (payload.production) {
-        await db.dailyProduction.clear();
-        if (payload.production.length > 0) await db.dailyProduction.bulkPut(payload.production);
+      if (payload.production && payload.production.length > 0) {
+        await db.dailyProduction.bulkPut(payload.production);
       }
-      if (payload.replacements) {
-        await db.replacements.clear();
-        if (payload.replacements.length > 0) await db.replacements.bulkPut(payload.replacements);
+      if (payload.replacements && payload.replacements.length > 0) {
+        await db.replacements.bulkPut(payload.replacements);
       }
       if (payload.jobOrders && payload.jobOrders.length > 0) {
-        await db.jobOrders.clear();
         await db.jobOrders.bulkPut(payload.jobOrders);
       }
       if (payload.auditLogs && payload.auditLogs.length > 0) {
-        await db.auditLogs.clear();
         await db.auditLogs.bulkPut(payload.auditLogs);
       }
       if (payload.personnel && payload.personnel.length > 0) {
-        await db.personnel.clear();
         await db.personnel.bulkPut(payload.personnel);
       }
     });

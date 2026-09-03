@@ -59,6 +59,8 @@ export const DailyProductionView: React.FC<DailyProductionViewProps> = ({
   const todayStr = getTodayStr(liveTime);
   const currentTimeStr = getNowTimeStr(liveTime);
 
+  const canEditOrDelete = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERVISOR' || currentUser?.role === 'LEADMAN';
+
   const [operatorFilter, setOperatorFilter] = useState('');
   const [setFilter, setSetFilter] = useState('ALL');
   const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY'>('ALL');
@@ -313,7 +315,7 @@ export const DailyProductionView: React.FC<DailyProductionViewProps> = ({
                 <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Operator</th>
                 <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Checked By</th>
                 <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A]">Remarks</th>
-                {currentUser?.role === 'ADMIN' && (
+                {canEditOrDelete && (
                   <th className="p-3 bg-[#191D28] border-b-2 border-[#1E222A] text-right">Actions</th>
                 )}
               </tr>
@@ -349,7 +351,7 @@ export const DailyProductionView: React.FC<DailyProductionViewProps> = ({
                     <td className="p-3 text-xs font-medium text-white whitespace-nowrap">{prod.operatorId}</td>
                     <td className="p-3 text-xs text-[#8E9299] whitespace-nowrap">{prod.checkedBy || '—'}</td>
                     <td className="p-3 text-xs text-[#8E9299] max-w-xs break-words whitespace-normal">{prod.remarks || '—'}</td>
-                    {currentUser?.role === 'ADMIN' && (
+                    {canEditOrDelete && (
                       <td className="p-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
@@ -381,7 +383,7 @@ export const DailyProductionView: React.FC<DailyProductionViewProps> = ({
               })}
               {filteredProductions.length === 0 && (
                 <tr>
-                  <td colSpan={currentUser?.role === 'ADMIN' ? 10 : 9} className="p-8 text-center text-[#8E9299]">
+                  <td colSpan={canEditOrDelete ? 10 : 9} className="p-8 text-center text-[#8E9299]">
                     No daily production logs found matching your filter criteria.
                   </td>
                 </tr>

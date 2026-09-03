@@ -150,9 +150,13 @@ export interface AuditRecord {
   reason?: string;
   deviceInfo: string;
   checkedBy?: string;
+  operator?: string;
+  userRole?: string;
 }
 
-export type UserRole = 'ADMIN' | 'OPERATOR';
+export type PersonnelRole = 'Leadman' | 'Operator' | 'Supervisor' | 'Admin';
+
+export type UserRole = 'ADMIN' | 'SUPERVISOR' | 'LEADMAN' | 'OPERATOR';
 
 export interface User {
   name: string;
@@ -164,7 +168,32 @@ export interface Personnel {
   fullName: string;
   shortName: string;
   position: string;
+  role?: PersonnelRole;
   isAuthorized: boolean;
   password?: string;
+}
+
+export function getPersonnelRole(p: Personnel): PersonnelRole {
+  if (p.role) return p.role;
+  const pos = (p.position || '').toLowerCase();
+  if (pos.includes('admin')) return 'Admin';
+  if (pos.includes('supervisor')) return 'Supervisor';
+  if (pos.includes('leadman')) return 'Leadman';
+  return 'Operator';
+}
+
+export function getAppRoleFromPersonnel(p: Personnel): UserRole {
+  const r = getPersonnelRole(p);
+  switch (r) {
+    case 'Admin':
+      return 'ADMIN';
+    case 'Supervisor':
+      return 'SUPERVISOR';
+    case 'Leadman':
+      return 'LEADMAN';
+    case 'Operator':
+    default:
+      return 'OPERATOR';
+  }
 }
 

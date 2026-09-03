@@ -63,6 +63,8 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ auditLogs, sets, pos
       const q = searchQuery.toLowerCase();
       const matchesCode = log.auditCode.toLowerCase().includes(q);
       const matchesUser = log.user.toLowerCase().includes(q);
+      const matchesOperator = (log.operator || '').toLowerCase().includes(q);
+      const matchesCheckedBy = (log.checkedBy || '').toLowerCase().includes(q);
       const matchesReason = (log.reason || '').toLowerCase().includes(q);
       const matchesOld = (log.oldValue || '').toLowerCase().includes(q);
       const matchesNew = (log.newValue || '').toLowerCase().includes(q);
@@ -74,6 +76,8 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ auditLogs, sets, pos
       if (
         !matchesCode &&
         !matchesUser &&
+        !matchesOperator &&
+        !matchesCheckedBy &&
         !matchesReason &&
         !matchesOld &&
         !matchesNew &&
@@ -86,6 +90,25 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ auditLogs, sets, pos
 
     return true;
   });
+
+  const getUserDisplay = (log: AuditRecord) => {
+    // Operator or Admin shall only appear on creating new set.
+    if (log.action === 'CREATE_SET') {
+      if (log.userRole === 'ADMIN' || log.user === 'Admin' || log.user === 'Administrator') {
+        return 'Admin';
+      }
+      return 'Operator';
+    }
+    // On deleting, editing, or other actions, display the logged account name
+    return log.user || 'Operator';
+  };
+
+  const getOperatorDisplay = (log: AuditRecord) => {
+    if (log.action === 'CREATE_SET' || log.action === 'EDIT_SET' || log.action === 'DELETE_SET') {
+      return '-';
+    }
+    return log.operator || (log.action === 'ADD_PRODUCTION' || log.action === 'INSTALL_PLATE' || log.action === 'REPLACE_PLATE' ? log.user : '-');
+  };
 
   const formatValue = (val: string | undefined, action: string) => {
     if (!val) return val;
@@ -229,7 +252,8 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ auditLogs, sets, pos
                 <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">Audit Code</th>
                 <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">Timestamp</th>
                 <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">Set / Position</th>
-                <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">User (Operator)</th>
+                <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">User</th>
+                <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">Operator Name</th>
                 <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">Checked By</th>
                 <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">Action</th>
                 <th className="p-4 bg-[#191D28] border-b-2 border-[#1E222A]">Details / Values Changed</th>
@@ -238,7 +262,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ auditLogs, sets, pos
             <tbody className="divide-y divide-[#1E222A] text-sm">
               {filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-[#8E9299]">
+                  <td colSpan={8} className="p-8 text-center text-[#8E9299]">
                     <HelpCircle className="w-8 h-8 text-[#8E9299]/30 mx-auto mb-2" />
                     No matching traceability records found for the current selection.
                   </td>
@@ -281,8 +305,23 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ auditLogs, sets, pos
                       </td>
 
                       {/* User */}
+                      <td className="p-4 font-medium whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                          getUserDisplay(log) === 'Admin'
+                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                            : 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
+                        }`}>
+                          {getUserDisplay(log)}
+                        </span>
+                      </td>
+
+                      {/* Operator Name */}
                       <td className="p-4 font-medium text-white whitespace-nowrap">
-                        {log.user}
+                        {getOperatorDisplay(log) === '-' ? (
+                          <span className="text-[#8E9299] font-mono">-</span>
+                        ) : (
+                          getOperatorDisplay(log)
+                        )}
                       </td>
 
                       {/* Checked By */}

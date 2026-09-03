@@ -230,13 +230,16 @@ export async function exportAllDataToExcel(): Promise<void> {
     .map(log => ({
       'Audit Code': log.auditCode,
       'Timestamp': log.timestamp,
-      'User / Operator': log.user,
+      'User': log.action === 'CREATE_SET'
+        ? (log.userRole === 'ADMIN' || log.user === 'Admin' || log.user === 'Administrator' ? 'Admin' : 'Operator')
+        : (log.user || 'Operator'),
+      'Operator Name': (log.action === 'CREATE_SET' || log.action === 'EDIT_SET' || log.action === 'DELETE_SET') ? '-' : (log.operator || log.user || '-'),
+      'Checked By Signoff': log.checkedBy || '—',
       'Action Performed': log.action,
       'Record ID': log.recordId || '—',
       'Old Value': log.oldValue || '—',
       'New Value': log.newValue || '—',
       'Reason / Details': log.reason || '—',
-      'Checked By Signoff': log.checkedBy || '—',
       'Device Info': log.deviceInfo || '—'
     }));
   const auditSheet = XLSX.utils.json_to_sheet(auditData);
