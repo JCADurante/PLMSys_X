@@ -33,7 +33,35 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
   } | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
+  // Allowed roles based on logged-in user permissions:
+  // - Leadman cannot create Supervisor or Admin accounts
+  // - Supervisor cannot create Admin accounts
+  // - Admin can create any account
+  const allowedRoles: PersonnelRole[] = React.useMemo(() => {
+    if (currentUser?.role === 'LEADMAN') {
+      return ['Operator', 'Leadman'];
+    }
+    if (currentUser?.role === 'SUPERVISOR') {
+      return ['Operator', 'Leadman', 'Supervisor'];
+    }
+    if (currentUser?.role === 'ADMIN') {
+      return ['Operator', 'Leadman', 'Supervisor', 'Admin'];
+    }
+    return ['Operator'];
+  }, [currentUser?.role]);
+
   const handleRoleChange = (newRole: PersonnelRole) => {
+    if (!allowedRoles.includes(newRole)) {
+      if (currentUser?.role === 'LEADMAN') {
+        setFormError('Access Denied: Leadman accounts cannot create accounts for Supervisor or Admin.');
+      } else if (currentUser?.role === 'SUPERVISOR') {
+        setFormError('Access Denied: Supervisor accounts cannot create accounts for Admin.');
+      } else {
+        setFormError(`Access Denied: You do not have permission to assign the ${newRole} role.`);
+      }
+      return;
+    }
+    setFormError('');
     setSelectedRole(newRole);
     setPosition(newRole);
     if (newRole === 'Leadman' || newRole === 'Supervisor' || newRole === 'Admin') {
@@ -47,6 +75,32 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+
+    if (currentUser?.role === 'OPERATOR') {
+      setFormError('Access Denied: Operator accounts do not have permission to register personnel.');
+      return;
+    }
+
+    if (!allowedRoles.includes(selectedRole)) {
+      if (currentUser?.role === 'LEADMAN') {
+        setFormError('Access Denied: Leadman accounts cannot create accounts for Supervisor or Admin.');
+      } else if (currentUser?.role === 'SUPERVISOR') {
+        setFormError('Access Denied: Supervisor accounts cannot create accounts for Admin.');
+      } else {
+        setFormError(`Access Denied: You do not have permission to create ${selectedRole} accounts.`);
+      }
+      return;
+    }
+
+    const lowerPos = position.trim().toLowerCase();
+    if (currentUser?.role === 'LEADMAN' && (lowerPos.includes('supervisor') || lowerPos.includes('admin'))) {
+      setFormError('Access Denied: Leadman accounts cannot assign Supervisor or Admin titles/designations.');
+      return;
+    }
+    if (currentUser?.role === 'SUPERVISOR' && lowerPos.includes('admin')) {
+      setFormError('Access Denied: Supervisor accounts cannot assign Admin titles/designations.');
+      return;
+    }
 
     if (!fullName.trim() || !shortName.trim() || !position.trim()) {
       setFormError('Please fill in all required fields (Full Name, Short Name, Position).');
@@ -233,20 +287,42 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-bold text-[#8E9299] uppercase tracking-wider block mb-1">
-                System Role Selection *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-[#8E9299] uppercase tracking-wider block">
+                  System Role Selection *
+                </label>
+                {currentUser?.role === 'LEADMAN' && (
+                  <span className="text-[10px] text-teal-400 font-semibold">
+                    Operator & Leadman only
+                  </span>
+                )}
+                {currentUser?.role === 'SUPERVISOR' && (
+                  <span className="text-[10px] text-purple-400 font-semibold">
+                    Cannot create Admin
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedRole}
                 onChange={(e) => handleRoleChange(e.target.value as PersonnelRole)}
                 className="w-full p-2.5 bg-[#0F1117] text-white rounded-lg border border-[#1E222A] focus:ring-2 focus:ring-[#F27D26] outline-none text-xs font-semibold cursor-pointer"
               >
-                {AVAILABLE_ROLES.map((r) => (
+                {allowedRoles.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
                 ))}
               </select>
+              {currentUser?.role === 'LEADMAN' && (
+                <span className="text-[10px] text-[#8E9299] mt-1 block">
+                  Leadman accounts cannot create accounts for Supervisor or Admin.
+                </span>
+              )}
+              {currentUser?.role === 'SUPERVISOR' && (
+                <span className="text-[10px] text-[#8E9299] mt-1 block">
+                  Supervisor accounts cannot create accounts for Admin.
+                </span>
+              )}
             </div>
 
             <div>

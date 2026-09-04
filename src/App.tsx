@@ -1270,6 +1270,25 @@ export default function App() {
   };
 
   const handleAddPersonnel = async (personnelData: Omit<Personnel, 'id'>) => {
+    const targetRole = personnelData.role || (
+      personnelData.position?.toLowerCase().includes('admin') ? 'Admin' :
+      personnelData.position?.toLowerCase().includes('supervisor') ? 'Supervisor' :
+      personnelData.position?.toLowerCase().includes('leadman') ? 'Leadman' : 'Operator'
+    );
+
+    if (currentUser.role === 'LEADMAN' && (targetRole === 'Supervisor' || targetRole === 'Admin')) {
+      alert('Access Denied: Leadman accounts cannot create accounts for Supervisor or Admin.');
+      return;
+    }
+    if (currentUser.role === 'SUPERVISOR' && targetRole === 'Admin') {
+      alert('Access Denied: Supervisor accounts cannot create accounts for Admin.');
+      return;
+    }
+    if (currentUser.role === 'OPERATOR') {
+      alert('Access Denied: Operator accounts do not have permission to register personnel.');
+      return;
+    }
+
     const id = generateUUID();
     await db.personnel.put({ id, ...personnelData });
     await mutateAndSync();
